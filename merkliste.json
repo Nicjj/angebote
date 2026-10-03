@@ -1,0 +1,47 @@
+[
+  {
+    "name": "Corona",
+    "suche": [
+      "Corona",
+      "Corona-Extra"
+    ],
+    "muss": [
+      "corona"
+    ]
+  },
+  {
+    "name": "Barefoot Weißwein Moscato",
+    "suche": [
+      "Barefoot",
+      "Moscato",
+      "Weisswein",
+      "Wein"
+    ],
+    "muss": [
+      "barefoot"
+    ]
+  },
+  {
+    "name": "Batida de Coco",
+    "suche": [
+      "Batida-de-Coco",
+      "Batida",
+      "Likoer"
+    ],
+    "muss": [
+      "batida"
+    ]
+  },
+  {
+    "name": "Pesto Rosso von Barilla",
+    "suche": [
+      "Pesto-Rosso",
+      "Barilla",
+      "Pesto"
+    ],
+    "muss": [
+      "barilla",
+      "pesto"
+    ]
+  }
+]

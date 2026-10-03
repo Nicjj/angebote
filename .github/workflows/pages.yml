@@ -1,0 +1,60 @@
+name: Seite veröffentlichen
+
+# live  → https://nicjj.github.io/angebote/
+# testing → https://nicjj.github.io/angebote/test/
+# Beide Fassungen werden bei jedem Lauf gemeinsam gebaut, weil GitHub Pages nur eine Seite je Repo kennt.
+on:
+  push:
+    branches: [testing, live]
+  schedule:
+    - cron: "17 * * * *" # stündlich neue Angebote holen
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  bauen:
+    runs-on: ubuntu-latest
+    env:
+      KAUFDA_ABSTAND_MS: "2000" # kaufDA bittet in robots.txt um 2 s Abstand
+      TZ: Europe/Berlin
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: live, path: live }
+      - uses: actions/checkout@v4
+        with: { ref: testing, path: testing }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+
+      - name: Live-Fassung bauen
+        run: |
+          mkdir -p _site
+          cp live/index.html _site/
+          node live/tools/aktualisieren.js _site
+
+      - name: Test-Fassung bauen
+        run: |
+          mkdir -p _site/test
+          sed 's#<head>#<head>\n<meta name="robots" content="noindex">#' testing/index.html > _site/test/index.html
+          node testing/tools/aktualisieren.js _site/test
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: _site }
+
+  veroeffentlichen:
+    needs: bauen
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Angebote</title>
+<style>
+  :root {
+    --bg: #f4f4f1; --karte: #ffffff; --text: #1b1b1b; --leise: #6b6b66; --linie: #e2e2dc;
+    --akzent: #d6301f; --akzent-text: #ffffff; --gut: #1f7a3a; --chip: #ecece6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413; --karte: #1f1f1d; --text: #ecece8; --leise: #9b9b94; --linie: #33332f;
+      --akzent: #ff5a44; --akzent-text: #141413; --gut: #5fcf7d; --chip: #2a2a27;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 26px; margin: 0; }
+  .orte { color: var(--leise); font-size: 14px; margin: 2px 0 16px; }
+  h2 { font-size: 19px; margin: 32px 0 10px; }
+  h3 { font-size: 16px; margin: 18px 0 8px; display: flex; gap: 8px; align-items: baseline; }
+  h3 .anzahl { color: var(--leise); font-weight: 400; font-size: 14px; }
+
+  form.suche { display: flex; gap: 8px; }
+  input[type=search], input[type=text] {
+    flex: 1; min-width: 0; font: inherit; padding: 11px 14px; border-radius: 10px;
+    border: 1px solid var(--linie); background: var(--karte); color: var(--text);
+  }
+  button { font: inherit; cursor: pointer; border: 0; border-radius: 10px; padding: 10px 16px;
+    background: var(--akzent); color: var(--akzent-text); font-weight: 600; }
+  button.leise { background: var(--chip); color: var(--text); font-weight: 500; }
+
+  .filter { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+  .filter button { padding: 6px 12px; font-size: 14px; background: var(--chip); color: var(--text); font-weight: 500; }
+  .filter button.an { background: var(--text); color: var(--bg); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; background: var(--chip);
+    border-radius: 999px; padding: 4px 4px 4px 12px; font-size: 14px; }
+  .chip button { background: none; color: var(--leise); padding: 2px 8px; font-size: 16px; line-height: 1; }
+  .chip button:hover { color: var(--akzent); }
+  form.neu { display: flex; gap: 8px; max-width: 420px; }
+
+  .liste { display: grid; gap: 8px; }
+  .angebot { display: grid; grid-template-columns: 72px 1fr auto; gap: 12px; align-items: center;
+    background: var(--karte); border: 1px solid var(--linie); border-radius: 12px; padding: 10px; }
+  .angebot img, .angebot .ohnebild { width: 72px; height: 72px; object-fit: contain; border-radius: 8px; background: #fff; }
+  .angebot .ohnebild { background: var(--chip); }
+  .laden { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .02em;
+    background: var(--text); color: var(--bg); border-radius: 6px; padding: 1px 7px; }
+  .titel { font-weight: 600; margin-top: 3px; }
+  .beschreibung { color: var(--leise); font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden; }
+  .zeit { font-size: 13px; margin-top: 3px; }
+  .zeit .kommt { color: var(--akzent); font-weight: 600; }
+  .preis { text-align: right; white-space: nowrap; }
+  .preis b { font-size: 21px; color: var(--akzent); }
+  .preis s, .preis small { display: block; color: var(--leise); font-size: 12px; }
+  .preis .minus { display: inline-block; margin-left: 6px; font-size: 12px; font-weight: 700;
+    background: var(--akzent); color: var(--akzent-text); border-radius: 6px; padding: 1px 6px; vertical-align: 3px; }
+
+  .leer { color: var(--leise); font-size: 14px; padding: 4px 0; }
+  .laedt { color: var(--leise); font-size: 14px; }
+  .kopf { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .kopf button { padding: 6px 12px; font-size: 14px; }
+  .frage { background: var(--karte); border: 1px solid var(--linie); border-radius: 12px; padding: 14px; margin-top: 10px; }
+  .frage p { margin: 0 0 10px; }
+  .frage .wahl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .frage .wahl button small { font-weight: 400; opacity: .8; }
+  .frage .nein { background: none; color: var(--leise); text-decoration: underline; padding: 6px 4px; font-weight: 400; }
+  .unbekannt { color: var(--akzent); }
+  footer { color: var(--leise); font-size: 12px; margin-top: 40px; }
+
+  @media (max-width: 520px) {
+    .angebot { grid-template-columns: 56px 1fr; }
+    .angebot img, .angebot .ohnebild { width: 56px; height: 56px; }
+    .preis { grid-column: 2; text-align: left; display: flex; gap: 8px; align-items: baseline; }
+    .preis s, .preis small { display: inline; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Angebote</h1>
+  <div class="orte" id="orte">&nbsp;</div>
+
+  <form class="suche" id="sucheForm">
+    <input type="search" id="q" placeholder="Was suchst du? z. B. Corona" autocomplete="off">
+    <button>Suchen</button>
+  </form>
+  <div class="filter" id="filter">
+    <button type="button" data-f="meine">Meine Läden</button>
+    <button type="button" data-f="alle">Alle Läden</button>
+  </div>
+
+  <section id="suchBereich" hidden>
+    <div class="kopf">
+      <h2 id="suchTitel"></h2>
+      <button class="leise" id="merken">Auf die Merkliste</button>
+    </div>
+    <div id="suchErgebnis"></div>
+  </section>
+
+  <section>
+    <h2>Merkliste – diese Woche im Angebot</h2>
+    <div class="chips" id="chips"></div>
+    <form class="neu" id="neuForm">
+      <input type="text" id="neu" placeholder="Stichpunkt hinzufügen" autocomplete="off">
+      <button class="leise">Hinzufügen</button>
+    </form>
+    <div id="neuFrage"></div>
+    <div id="merkErgebnis"></div>
+  </section>
+
+  <footer>Daten von kaufDA und marktguru. Angaben ohne Gewähr, maßgeblich ist der Prospekt im Laden.</footer>
+</main>
+
+<script>
+let einstellungen = { orte: [], lieblingslaeden: [], getraenkehandel: "" };
+let merkliste = [];
+let filter = "alle";
+const ergebnisse = new Map(); // Begriff → Antwort vom Server
+let aktuelleSuche = "";
+let statisch = false; // true auf GitHub Pages: Daten aus angebote.json, ohne Suche und Bearbeiten
+
+try { filter = localStorage.getItem("angebote-filter") || "alle"; } catch {}
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const euro = (n) => n == null ? "" : n.toLocaleString("de-DE", { style: "currency", currency: "EUR" });
+const tag = (d) => d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
+
+function istMeinLaden(name) {
+  const n = name.toLowerCase();
+  if (einstellungen.lieblingslaeden.some((l) => n === l.toLowerCase())) return true;
+  return einstellungen.getraenkehandel && new RegExp(einstellungen.getraenkehandel, "i").test(name);
+}
+
+function gefiltert(angebote) {
+  // Abgelaufenes ausblenden, falls die Daten schon ein paar Stunden alt sind
+  const jetzt = Date.now();
+  const aktuell = angebote.filter((a) => !a.bis || new Date(a.bis).getTime() > jetzt);
+  return filter === "alle" ? aktuell : aktuell.filter((a) => istMeinLaden(a.laden));
+}
+
+function zeitText(a) {
+  const jetzt = new Date();
+  const von = a.von ? new Date(a.von) : null;
+  // Gültigkeitsende liegt oft um Mitternacht UTC, also schon am Folgetag deutscher Zeit
+  const bis = a.bis ? new Date(new Date(a.bis).getTime() - 1) : null;
+  if (von && von > jetzt) return `<span class="kommt">ab ${tag(von)}</span>${bis ? " bis " + tag(bis) : ""}`;
+  return bis ? "gültig bis " + tag(bis) : "";
+}
+
+function karte(a) {
+  const bild = a.bild
+    ? `<img src="${esc(a.bild)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ohnebild'}))">`
+    : `<div class="ohnebild"></div>`;
+  const alt = a.reduziert
+    ? `<span class="minus">−${Math.round((1 - a.preis / a.alterPreis) * 100)} %</span><s>${a.alterPreisUVP ? "UVP " : "statt "}${euro(a.alterPreis)}</s>` : "";
+  const zusatz = [a.grundpreis, a.hinweis].filter(Boolean).join(" · ");
+  return `<div class="angebot">
+    ${bild}
+    <div>
+      <span class="laden">${esc(a.laden)}</span>
+      <div class="titel">${esc(a.titel || a.beschreibung)}</div>
+      ${a.titel && a.beschreibung ? `<div class="beschreibung">${esc(a.beschreibung)}</div>` : ""}
+      <div class="zeit">${zeitText(a)}${a.orte?.length ? " · " + esc(a.orte.join(", ")) : ""}</div>
+    </div>
+    <div class="preis"><b>${euro(a.preis)}</b>${alt}${zusatz ? `<small>${esc(zusatz)}</small>` : ""}</div>
+  </div>`;
+}
+
+function liste(daten, leerText = "Gerade nicht im Angebot.") {
+  if (!daten) return `<div class="laedt">Wird gesucht …</div>`;
+  if (daten.fehler) return `<div class="leer">Fehler: ${esc(daten.fehler)}</div>`;
+  const sichtbar = gefiltert(daten.angebote);
+  if (!sichtbar.length) return `<div class="leer">${leerText}</div>`;
+  return `<div class="liste">${sichtbar.map(karte).join("")}</div>`;
+}
+
+const trefferZahl = (begriff) => {
+  const d = ergebnisse.get(begriff);
+  return d && d.angebote ? gefiltert(d.angebote).length : null;
+};
+
+async function pruefe(text) {
+  try { return await (await fetch("/api/pruefen?q=" + encodeURIComponent(text))).json(); }
+  catch { return { bekannt: true, vorschlaege: [] }; }
+}
+
+// „Meinten Sie …?“-Kasten. aktion: "suche" oder "merke"
+function frage(eingabe, vorschlaege, aktion) {
+  const knoepfe = vorschlaege.map((v) =>
+    `<button type="button" data-${aktion}="${esc(v.text)}">${esc(v.text)}${v.art ? ` <small>(${esc(v.art)})</small>` : ""}</button>`).join("");
+  const nein = aktion === "suche" ? `Nein, nach „${esc(eingabe)}“ suchen` : `Nein, „${esc(eingabe)}“ so hinzufügen`;
+  return `<div class="frage"><p>Meintest du ${vorschlaege.length > 1 ? "eins davon" : "das"}?</p>
+    <div class="wahl">${knoepfe}<button type="button" class="nein" data-${aktion}-trotzdem="${esc(eingabe)}">${nein}</button></div></div>`;
+}
+
+const nichtsAnfangen = (eingabe) =>
+  `Mit deiner Eingabe „<span class="unbekannt">${esc(eingabe)}</span>“ kann ich nichts anfangen. Bitte überprüfe deine Eingabe.`;
+
+async function hole(begriff) {
+  try {
+    const r = await fetch("/api/suche?q=" + encodeURIComponent(begriff));
+    ergebnisse.set(begriff, await r.json());
+  } catch (e) {
+    ergebnisse.set(begriff, { fehler: "Server nicht erreichbar", angebote: [] });
+  }
+}
+
+function zeichneMerkliste() {
+  $("chips").innerHTML = merkliste.map((b, i) =>
+    `<span class="chip">${esc(b)}${statisch ? "" : `<button title="Entfernen" data-weg="${i}">×</button>`}</span>`).join("");
+  if (!merkliste.length) { $("merkErgebnis").innerHTML = `<div class="leer">Noch nichts auf der Merkliste.</div>`; return; }
+  // Nur Begriffe zeigen, die gerade im Angebot sind
+  const imAngebot = merkliste.filter((b) => trefferZahl(b) > 0);
+  const laedtNoch = merkliste.some((b) => !ergebnisse.has(b));
+  $("merkErgebnis").innerHTML = imAngebot.map((b) => {
+    const n = trefferZahl(b);
+    return `<h3>${esc(b)} <span class="anzahl">${n} Angebot${n === 1 ? "" : "e"}</span></h3>${liste(ergebnisse.get(b))}`;
+  }).join("")
+    + (laedtNoch ? `<div class="laedt">Wird gesucht …</div>`
+      : imAngebot.length ? "" : `<div class="leer">Gerade ist nichts von deiner Merkliste im Angebot.</div>`);
+}
+
+let suchFrage = null;   // { eingabe, vorschlaege } solange die Rückfrage offen ist
+let suchBekannt = true; // kennt der Wortschatz den Suchbegriff?
+
+function zeichneSuche() {
+  if (suchFrage) {
+    $("suchBereich").hidden = false;
+    $("suchTitel").textContent = "Suche: " + suchFrage.eingabe;
+    $("merken").hidden = true;
+    $("suchErgebnis").innerHTML = frage(suchFrage.eingabe, suchFrage.vorschlaege, "suche");
+    return;
+  }
+  if (!aktuelleSuche) { $("suchBereich").hidden = true; return; }
+  $("suchBereich").hidden = false;
+  $("merken").hidden = false;
+  $("suchTitel").textContent = "Suche: " + aktuelleSuche;
+  const drauf = merkliste.some((b) => b.toLowerCase() === aktuelleSuche.toLowerCase());
+  $("merken").disabled = drauf;
+  $("merken").textContent = drauf ? "Auf der Merkliste ✓" : "Auf die Merkliste";
+  $("suchErgebnis").innerHTML = liste(ergebnisse.get(aktuelleSuche),
+    suchBekannt ? "Gerade nicht im Angebot." : nichtsAnfangen(aktuelleSuche));
+}
+
+function zeichneFilter() {
+  for (const b of $("filter").querySelectorAll("button")) b.classList.toggle("an", b.dataset.f === filter);
+}
+
+function allesZeichnen() { zeichneFilter(); zeichneSuche(); zeichneMerkliste(); }
+
+async function speichereMerkliste() {
+  const r = await fetch("/api/merkliste", { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ begriffe: merkliste }) });
+  merkliste = await r.json();
+}
+
+async function hinzufuegen(begriff) {
+  begriff = begriff.trim();
+  if (!begriff || merkliste.some((b) => b.toLowerCase() === begriff.toLowerCase())) return;
+  merkliste.push(begriff);
+  await speichereMerkliste();
+  allesZeichnen();
+  if (!ergebnisse.has(begriff)) { await hole(begriff); allesZeichnen(); }
+}
+
+async function suche(q, ohneRueckfrage = false) {
+  q = q.trim();
+  if (!q) return;
+  $("q").value = q;
+  suchFrage = null;
+  const p = ohneRueckfrage ? { bekannt: false, vorschlaege: [] } : await pruefe(q);
+  if (!p.bekannt && p.vorschlaege.length) {
+    suchFrage = { eingabe: q, vorschlaege: p.vorschlaege };
+    aktuelleSuche = "";
+    return zeichneSuche();
+  }
+  suchBekannt = p.bekannt;
+  aktuelleSuche = q;
+  ergebnisse.delete(q);
+  zeichneSuche();
+  await hole(q);
+  if (aktuelleSuche === q) zeichneSuche();
+}
+
+$("sucheForm").addEventListener("submit", (e) => { e.preventDefault(); suche($("q").value); });
+
+$("suchErgebnis").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.suche) suche(b.dataset.suche, true);
+  else if (b.dataset.sucheTrotzdem) suche(b.dataset.sucheTrotzdem, true);
+});
+
+$("merken").addEventListener("click", () => hinzufuegen(aktuelleSuche));
+
+$("neuForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = $("neu").value.trim();
+  if (!text) return;
+  const p = await pruefe(text);
+  if (p.bekannt) {
+    $("neuFrage").innerHTML = "";
+    $("neu").value = "";
+    return hinzufuegen(text);
+  }
+  $("neuFrage").innerHTML = p.vorschlaege.length
+    ? frage(text, p.vorschlaege, "merke")
+    : `<div class="frage"><p>${nichtsAnfangen(text)}</p><div class="wahl">
+        <button type="button" class="nein" data-merke-trotzdem="${esc(text)}">Trotzdem hinzufügen</button></div></div>`;
+});
+
+$("neuFrage").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  const text = b.dataset.merke || b.dataset.merkeTrotzdem;
+  if (!text) return;
+  $("neuFrage").innerHTML = "";
+  $("neu").value = "";
+  hinzufuegen(text);
+});
+
+$("chips").addEventListener("click", async (e) => {
+  const i = e.target.dataset.weg;
+  if (i === undefined) return;
+  merkliste.splice(Number(i), 1);
+  await speichereMerkliste();
+  allesZeichnen();
+});
+
+$("filter").addEventListener("click", (e) => {
+  if (!e.target.dataset.f) return;
+  filter = e.target.dataset.f;
+  try { localStorage.setItem("angebote-filter", filter); } catch {}
+  allesZeichnen();
+});
+
+async function statischLaden() {
+  statisch = true;
+  for (const id of ["sucheForm", "neuForm", "suchBereich"]) $(id).hidden = true;
+  $("sucheForm").style.display = $("neuForm").style.display = "none";
+  try {
+    const daten = await (await fetch("angebote.json", { cache: "no-store" })).json();
+    einstellungen = daten.einstellungen;
+    merkliste = daten.merkliste.map((e) => e.name);
+    for (const e of daten.merkliste) ergebnisse.set(e.name, { angebote: e.angebote });
+    const stand = new Date(daten.stand).toLocaleString("de-DE",
+      { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    $("orte").textContent = einstellungen.orte.map((o) => o.name).join(" · ") + " — Stand " + stand + " Uhr";
+  } catch {
+    $("merkErgebnis").innerHTML = `<div class="leer">Die Angebote konnten gerade nicht geladen werden.</div>`;
+    return;
+  }
+  zeichneMerkliste();
+}
+
+(async () => {
+  zeichneFilter();
+  // Ohne lokalen Server (GitHub Pages) gibt es keine /api – dann die vorbereiteten Daten nehmen
+  const api = await fetch("/api/einstellungen").then((r) => r.ok && r.headers.get("content-type")?.includes("json")).catch(() => false);
+  if (!api) return statischLaden();
+  try {
+    [einstellungen, merkliste] = await Promise.all([
+      fetch("/api/einstellungen").then((r) => r.json()),
+      fetch("/api/merkliste").then((r) => r.json()),
+    ]);
+  } catch {
+    $("merkErgebnis").innerHTML = `<div class="leer">Server nicht erreichbar – läuft „node server.js“?</div>`;
+    return;
+  }
+  $("orte").textContent = einstellungen.orte.map((o) => o.name).join(" · ");
+  zeichneMerkliste();
+  // Alle Merklisten-Begriffe gleichzeitig abfragen, jeder erscheint, sobald er da ist
+  await Promise.all(merkliste.map((b) => hole(b).then(zeichneMerkliste)));
+})();
+</script>
+</body>
+</html>
