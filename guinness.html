@@ -99,6 +99,9 @@
     .weg { padding: 4px 4px; }
   }
 
+  .status { font-size: 13px; color: var(--leise); margin: -8px 0 12px; }
+  .status[data-z="live"] { color: var(--s3); }
+  .status[data-z="fehler"] { color: var(--s8); font-weight: 600; }
   .tabellen { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
   .tabellen button.tab { background: var(--chip); color: var(--text); font-weight: 500; padding: 7px 14px; font-size: 14px; border-radius: 999px; }
   .tabellen button.tab.an { background: var(--akzent); color: var(--akzent-text); font-weight: 600; }
@@ -116,6 +119,7 @@
   <h1>The Great Guinness Game</h1>
   <div class="unter">Jedes Guinness bringt Punkte. Wer am Ende vorne liegt, hat gewonnen.</div>
 
+  <div class="status" id="status"></div>
   <div class="tabellen" id="tabellen"></div>
   <div class="titelzeile">
     <input type="text" id="tabelleName" aria-label="Name der Tabelle" maxlength="40">
@@ -150,31 +154,45 @@
     <button class="leise klein" id="laden">Spielstand laden</button>
     <input type="file" id="datei" accept="application/json" hidden>
   </div>
-  <footer>Alle Tabellen werden nur in diesem Browser gespeichert, also am besten immer am selben Handy eintragen. Mit „Spielstand sichern“ lädst du sie als Datei herunter.</footer>
+  <footer>Alles wird online gespeichert: Jeder mit dem Link sieht denselben Stand und kann eintragen. Ohne Netz wird weiter gespeichert und nachgereicht, sobald wieder Verbindung da ist. „Spielstand sichern“ lädt zusätzlich eine Sicherungsdatei herunter.</footer>
 </main>
 
-<script>
-// Test- und Live-Seite liegen auf derselben Domain: getrennte Speicherplätze, damit ein Test nie das echte Spiel überschreibt
-const SPEICHER = "guinness-spiel-v2" + (location.pathname.includes("/test/") ? "-test" : "");
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import {
+  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  collection, doc, onSnapshot, setDoc, updateDoc, deleteField,
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+
+// Öffentliche Web-Konfiguration des Firebase-Projekts (kein Geheimnis, der Schutz liegt in firestore.rules)
+const app = initializeApp({
+  apiKey: "AIzaSyBXh_TvYQYvc5DlCOiSM6dLbY3RrAPCNWU",
+  authDomain: "great-guinness-game.firebaseapp.com",
+  projectId: "great-guinness-game",
+  storageBucket: "great-guinness-game.firebasestorage.app",
+  messagingSenderId: "73739133293",
+  appId: "1:73739133293:web:c432f21baf25e8f2203a64",
+});
+// Lokaler Zwischenspeicher: ohne Netz wird weiter eingetragen und später nachgereicht
+const db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+
+// Live-Seite schreibt in „guinness“, Test-Seite und lokaler Server in „guinness-test“
+const LIVE = location.hostname.endsWith("github.io") && !location.pathname.includes("/test/");
+const SAMMLUNG = LIVE ? "guinness" : "guinness-test";
 const FARBEN = 8; // feste Reihenfolge --s1 … --s8, Farbe hängt am Spieler, nicht am Rang
 
-// Mehrere Tabellen; spiel zeigt immer auf die gerade offene
-let daten = null;
-let spiel;
+let daten = { spiele: [] }; // alle Tabellen, aus der Datenbank gebaut
+let spiel = null;           // die gerade offene Tabelle
+let aktivId = null;         // welche Tabelle dieses Gerät offen hat
 let ansicht = "gesamt";
+let fokusRunde = null;      // nach „+ Runde“ das erste Feld der neuen Runde fokussieren
+let spaeterZeichnen = false;
+// Fortlaufende Position, auch wenn mehrere Einträge in derselben Millisekunde entstehen
+let letztePos = 0;
+const naechstePos = () => (letztePos = Math.max(Date.now(), letztePos + 1));
+const farbenVergeben = new Map(); // Tabellen-ID → in dieser Sitzung vergebene Farben
 
-const neueTabelle = (name, spieler = []) =>
-  ({ id: Math.random().toString(36).slice(2, 10), name, spieler, runden: [] });
-
-try { daten = JSON.parse(localStorage.getItem(SPEICHER)); } catch {}
-if (!daten?.spiele?.length) {
-  let alt = null; // Spielstand aus der ersten Fassung übernehmen
-  try { alt = JSON.parse(localStorage.getItem("guinness-spiel-v1")); } catch {}
-  const erste = neueTabelle("Guinness-Abend " + new Date().toLocaleDateString("de-DE"));
-  if (alt?.spieler) Object.assign(erste, { spieler: alt.spieler, runden: alt.runden || [] });
-  daten = { aktiv: erste.id, spiele: [erste] };
-}
-spiel = daten.spiele.find((t) => t.id === daten.aktiv) || daten.spiele[0];
+try { aktivId = localStorage.getItem("guinness-aktiv-" + SAMMLUNG); } catch {}
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -182,17 +200,92 @@ const id = () => Math.random().toString(36).slice(2, 10);
 const farbe = (s) => `var(--s${(s.farbe % FARBEN) + 1})`;
 const zahl = (n) => (Math.round(n * 100) / 100).toLocaleString("de-DE");
 const punkte = (runde, s) => Number(runde.punkte[s.id]) || 0;
+const heute = () => "Guinness-Abend " + new Date().toLocaleDateString("de-DE");
 
-function speichern() {
-  daten.aktiv = spiel.id;
-  try { localStorage.setItem(SPEICHER, JSON.stringify(daten)); } catch {}
+// ---------- Datenbank ----------
+
+// Datenbank-Dokument → Ansicht mit sortierten Listen ohne gelöschte Einträge
+function ansichtAus(tid, d) {
+  const liste = (m) => Object.entries(m || {}).map(([id, x]) => ({ ...x, id }))
+    .filter((x) => !x.geloescht).sort((a, b) => (a.pos || 0) - (b.pos || 0));
+  return {
+    id: tid, name: d.name || "", erstellt: d.erstellt || 0,
+    spieler: liste(d.spieler).map((s) => ({ id: s.id, name: s.name || "", farbe: s.farbe || 0 })),
+    runden: liste(d.runden).map((r) => ({ id: r.id, name: r.name || "", datum: r.datum, punkte: { ...(r.punkte || {}) } })),
+  };
+}
+
+const ref = (tid) => doc(db, SAMMLUNG, tid);
+
+// Nur einzelne Felder ändern: so überschreiben sich gleichzeitige Einträge verschiedener Leute nicht
+function schreib(felder, tid = spiel?.id) {
+  if (!tid) return;
+  zeigeStatus("speichert");
+  updateDoc(ref(tid), { ...felder, zeit: Date.now() }).catch(fehler);
+}
+
+// Beim Tippen nicht jeden Buchstaben senden, sondern kurz danach
+const ausstehend = new Map();
+function schreibSpaeter(pfad, wert) {
+  const tid = spiel.id;
+  const schluessel = tid + "|" + pfad;
+  clearTimeout(ausstehend.get(schluessel)?.timer);
+  const senden = () => { ausstehend.delete(schluessel); schreib({ [pfad]: wert }, tid); };
+  ausstehend.set(schluessel, { timer: setTimeout(senden, 400), senden });
+}
+const allesSenden = () => { for (const a of [...ausstehend.values()]) { clearTimeout(a.timer); a.senden(); } };
+addEventListener("pagehide", allesSenden);
+document.addEventListener("visibilitychange", () => { if (document.hidden) allesSenden(); });
+
+// Ansicht (oder alter lokaler Spielstand) → Datenbank-Dokument
+function alsDokument(t) {
+  const jetzt = Date.now();
+  const spieler = {}, runden = {};
+  (t.spieler || []).forEach((s, i) => { spieler[s.id || id()] = { name: String(s.name || ""), farbe: s.farbe ?? i, pos: i }; });
+  (t.runden || []).forEach((r, i) => {
+    const p = {};
+    for (const [sid, w] of Object.entries(r.punkte || {})) if (w !== null && w !== "" && !isNaN(Number(w))) p[sid] = Number(w);
+    runden[r.id || id()] = { name: String(r.name || "Runde " + (i + 1)), datum: r.datum || new Date().toISOString(), pos: i, punkte: p };
+  });
+  return { name: String(t.name || heute()).slice(0, 60), erstellt: t.erstellt || jetzt, zeit: jetzt, geloescht: false, spieler, runden };
+}
+
+// Gibt die ID sofort zurück: ohne Netz würde ein await erst nach der Rückkehr ins Netz fertig
+function hochladen(t) {
+  const tid = t.id || id();
+  setDoc(ref(tid), alsDokument(t), { merge: true }).catch(fehler);
+  return tid;
+}
+
+function neueTabelleAnlegen(name, spieler = []) {
+  return hochladen({ name, spieler: spieler.map((s) => ({ ...s })), runden: [] });
+}
+
+function waehle(tid) {
+  aktivId = tid;
+  try { localStorage.setItem("guinness-aktiv-" + SAMMLUNG, tid); } catch {}
+  spiel = daten.spiele.find((t) => t.id === tid) || daten.spiele[daten.spiele.length - 1] || null;
+}
+
+function fehler(e) { console.error(e); zeigeStatus("fehler"); }
+
+function zeigeStatus(z) {
+  const texte = {
+    laedt: "Verbinde …",
+    live: "● Live – alle sehen denselben Stand",
+    speichert: "Speichert …",
+    offline: "Offline – wird gespeichert, sobald wieder Netz da ist",
+    fehler: "Speichern fehlgeschlagen – bitte Seite neu laden",
+  };
+  $("status").textContent = texte[z];
+  $("status").dataset.z = z;
 }
 
 function zeichneTabellen() {
   $("tabellen").innerHTML = daten.spiele.map((t) =>
     `<button type="button" class="tab${t === spiel ? " an" : ""}" data-tabelle="${t.id}">${esc(t.name || "Ohne Namen")}</button>`).join("")
     + `<button type="button" class="leise klein" id="tabelleNeu">+ Neue Tabelle</button>`;
-  if (document.activeElement !== $("tabelleName")) $("tabelleName").value = spiel.name;
+  if (document.activeElement !== $("tabelleName")) $("tabelleName").value = spiel ? spiel.name : "";
 }
 
 function summen() {
@@ -220,7 +313,7 @@ function zeichneTabelle() {
         <span class="datum">${new Date(r.datum).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}</span>
         <button class="weg" data-runde-weg="${r.id}" title="Runde entfernen">×</button></div></td>
       ${spiel.spieler.map((s) => `<td class="zelle"><input inputmode="decimal" data-runde="${r.id}" data-spieler="${s.id}"
-        value="${r.punkte[s.id] ?? ""}" aria-label="${esc(s.name)}, ${esc(r.name)}"></td>`).join("")}
+        value="${String(r.punkte[s.id] ?? "").replace(".", ",")}" aria-label="${esc(s.name)}, ${esc(r.name)}"></td>`).join("")}
     </tr>`).join("");
   const fuss = spiel.spieler.map((s) =>
     `<td class="${spiel.runden.length && gesamt[s.id] === bester ? "fuehrt" : ""}" data-gesamt="${s.id}">${zahl(gesamt[s.id])}</td>`).join("");
@@ -229,10 +322,15 @@ function zeichneTabelle() {
     <tbody>${zeilen || `<tr><td colspan="${spiel.spieler.length + 1}" class="leer">Noch keine Runde – tippe auf „+ Runde“.</td></tr>`}</tbody>
     <tfoot><tr><td>Gesamt</td>${fuss}</tr></tfoot>
   </table>`;
+  if (fokusRunde && spiel.runden.some((r) => r.id === fokusRunde)) {
+    document.querySelector(`[data-runde="${fokusRunde}"]`)?.focus();
+    fokusRunde = null;
+  }
 }
 
 // Beim Tippen nur Summen und Kurven neu zeichnen, damit das Eingabefeld den Fokus behält
 function aktualisiereSummen() {
+  if (!spiel) return;
   const gesamt = summen();
   const bester = Math.max(...Object.values(gesamt));
   for (const s of spiel.spieler) {
@@ -368,57 +466,70 @@ function zeichneKarten() {
   }).join("");
 }
 
-function alles() { zeichneTabellen(); zeichneTabelle(); zeichneDiagramm(); zeichneKarten(); }
+function alles() {
+  zeichneTabellen();
+  if (!spiel) {
+    $("tabelle").innerHTML = `<div class="leer">Spielstand wird geladen …</div>`;
+    $("diagramm").innerHTML = $("legende").innerHTML = $("spielerkarten").innerHTML = "";
+    return;
+  }
+  zeichneTabelle(); zeichneDiagramm(); zeichneKarten();
+}
 
 $("tabellen").addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b) return;
   if (b.dataset.tabelle) {
-    spiel = daten.spiele.find((t) => t.id === b.dataset.tabelle);
+    allesSenden();
+    waehle(b.dataset.tabelle);
+    alles();
   } else if (b.id === "tabelleNeu") {
-    const name = prompt("Name der neuen Tabelle:", "Guinness-Abend " + new Date().toLocaleDateString("de-DE"));
+    const name = prompt("Name der neuen Tabelle:", heute());
     if (name === null) return;
-    const mitSpielern = spiel.spieler.length && confirm("Die Spieler aus „" + spiel.name + "“ übernehmen?");
-    const neu = neueTabelle(name.trim() || "Neue Tabelle",
-      mitSpielern ? spiel.spieler.map((s) => ({ ...s })) : []);
-    daten.spiele.push(neu);
-    spiel = neu;
-  } else return;
-  speichern(); alles();
+    const mitSpielern = spiel?.spieler.length && confirm("Die Spieler aus „" + spiel.name + "“ übernehmen?");
+    allesSenden();
+    aktivId = neueTabelleAnlegen(name.trim() || "Neue Tabelle", mitSpielern ? spiel.spieler : []);
+    waehle(aktivId);
+    alles();
+  }
 });
 
 $("tabelleName").addEventListener("input", () => {
-  spiel.name = $("tabelleName").value;
-  speichern(); zeichneTabellen();
+  if (!spiel) return;
+  spiel.name = $("tabelleName").value.slice(0, 60);
+  schreibSpaeter("name", spiel.name);
+  zeichneTabellen();
 });
 
 $("tabelleWeg").addEventListener("click", () => {
-  if (!confirm("Tabelle „" + spiel.name + "“ mit allen Runden und Punkten löschen?")) return;
-  daten.spiele = daten.spiele.filter((t) => t !== spiel);
-  if (!daten.spiele.length) daten.spiele.push(neueTabelle("Guinness-Abend " + new Date().toLocaleDateString("de-DE")));
-  spiel = daten.spiele[daten.spiele.length - 1];
-  speichern(); alles();
+  if (!spiel || !confirm("Tabelle „" + spiel.name + "“ mit allen Runden und Punkten löschen? Das gilt für alle.")) return;
+  schreib({ geloescht: true });
+  aktivId = null;
 });
 
 // ---------- Eingaben ----------
 
 $("spielerForm").addEventListener("submit", (e) => {
   e.preventDefault();
-  const name = $("spielerName").value.trim();
-  if (!name) return;
-  const belegt = new Set(spiel.spieler.map((s) => s.farbe));
+  const name = $("spielerName").value.trim().slice(0, 30);
+  if (!name || !spiel) return;
+  // Auch Farben mitzählen, die gerade erst vergeben wurden und noch nicht aus der Datenbank zurück sind
+  const vergeben = farbenVergeben.get(spiel.id) || new Set();
+  const belegt = new Set([...spiel.spieler.map((s) => s.farbe), ...vergeben]);
   let f = 0; while (belegt.has(f) && f < FARBEN) f++;
-  spiel.spieler.push({ id: id(), name, farbe: f < FARBEN ? f : spiel.spieler.length });
+  if (f >= FARBEN) f = spiel.spieler.length + vergeben.size;
+  vergeben.add(f);
+  farbenVergeben.set(spiel.id, vergeben);
+  schreib({ [`spieler.${id()}`]: { name, farbe: f, pos: naechstePos() } });
   $("spielerName").value = "";
-  speichern(); alles();
 });
 
 $("rundeNeu").addEventListener("click", () => {
+  if (!spiel) return;
   if (!spiel.spieler.length) { $("spielerName").focus(); return; }
-  spiel.runden.push({ id: id(), name: "Runde " + (spiel.runden.length + 1), datum: new Date().toISOString(), punkte: {} });
-  speichern(); alles();
-  const letzte = spiel.runden[spiel.runden.length - 1];
-  document.querySelector(`[data-runde="${letzte.id}"]`)?.focus();
+  const rid = id();
+  fokusRunde = rid;
+  schreib({ [`runden.${rid}`]: { name: "Runde " + (spiel.runden.length + 1), datum: new Date().toISOString(), pos: naechstePos(), punkte: {} } });
 });
 
 $("tabelle").addEventListener("input", (e) => {
@@ -426,19 +537,32 @@ $("tabelle").addEventListener("input", (e) => {
   if (t.dataset.runde) {
     const r = spiel.runden.find((r) => r.id === t.dataset.runde);
     const wert = t.value.replace(",", ".").trim();
-    if (wert === "" || wert === "-") delete r.punkte[t.dataset.spieler];
-    else if (!isNaN(Number(wert))) r.punkte[t.dataset.spieler] = Number(wert);
-    speichern(); aktualisiereSummen();
+    const pfad = `runden.${r.id}.punkte.${t.dataset.spieler}`;
+    if (wert === "" || wert === "-") {
+      delete r.punkte[t.dataset.spieler];
+      schreibSpaeter(pfad, deleteField());
+    } else if (!isNaN(Number(wert))) {
+      r.punkte[t.dataset.spieler] = Number(wert);
+      schreibSpaeter(pfad, Number(wert));
+    } else return;
+    aktualisiereSummen();
   } else if (t.dataset.spielerName) {
-    spiel.spieler.find((s) => s.id === t.dataset.spielerName).name = t.value;
-    speichern(); zeichneDiagramm(); zeichneKarten();
+    const s = spiel.spieler.find((s) => s.id === t.dataset.spielerName);
+    s.name = t.value.slice(0, 30);
+    schreibSpaeter(`spieler.${s.id}.name`, s.name);
+    zeichneDiagramm(); zeichneKarten();
   } else if (t.dataset.rundeName) {
-    spiel.runden.find((r) => r.id === t.dataset.rundeName).name = t.value;
-    speichern();
+    const r = spiel.runden.find((r) => r.id === t.dataset.rundeName);
+    r.name = t.value.slice(0, 40);
+    schreibSpaeter(`runden.${r.id}.name`, r.name);
   }
 });
 
-// Enter springt in die Zelle darunter, wie in einer Tabellenkalkulation
+// Erst neu zeichnen, wenn niemand mehr in der Tabelle tippt
+$("tabelle").addEventListener("focusout", () => setTimeout(() => {
+  if (spaeterZeichnen && !$("tabelle").contains(document.activeElement)) { spaeterZeichnen = false; alles(); }
+}, 0));
+
 $("tabelle").addEventListener("keydown", (e) => {
   if (e.key !== "Enter" || !e.target.dataset.runde) return;
   e.preventDefault();
@@ -453,15 +577,11 @@ $("tabelle").addEventListener("click", (e) => {
   if (!b) return;
   if (b.dataset.spielerWeg) {
     const s = spiel.spieler.find((s) => s.id === b.dataset.spielerWeg);
-    if (!confirm(`${s.name} mit allen Punkten entfernen?`)) return;
-    spiel.spieler = spiel.spieler.filter((x) => x !== s);
-    for (const r of spiel.runden) delete r.punkte[s.id];
+    if (confirm(`${s.name} mit allen Punkten entfernen?`)) schreib({ [`spieler.${s.id}.geloescht`]: true });
   } else if (b.dataset.rundeWeg) {
     const r = spiel.runden.find((r) => r.id === b.dataset.rundeWeg);
-    if (Object.keys(r.punkte).length && !confirm(`${r.name} mit allen Punkten entfernen?`)) return;
-    spiel.runden = spiel.runden.filter((x) => x !== r);
-  } else return;
-  speichern(); alles();
+    if (!Object.keys(r.punkte).length || confirm(`${r.name} mit allen Punkten entfernen?`)) schreib({ [`runden.${r.id}.geloescht`]: true });
+  }
 });
 
 $("ansicht").addEventListener("click", (e) => {
@@ -475,7 +595,7 @@ $("ansicht").addEventListener("click", (e) => {
 
 $("sichern").addEventListener("click", () => {
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(daten, null, 2)], { type: "application/json" }));
+  a.href = URL.createObjectURL(new Blob([JSON.stringify({ spiele: daten.spiele }, null, 2)], { type: "application/json" }));
   a.download = "guinness-spiel-" + new Date().toISOString().slice(0, 10) + ".json";
   a.click();
   URL.revokeObjectURL(a.href);
@@ -487,19 +607,15 @@ $("datei").addEventListener("change", async () => {
   if (!datei) return;
   try {
     const neu = JSON.parse(await datei.text());
-    if (Array.isArray(neu.spiele)) {
-      // komplette Sicherung: vorhandene Tabellen gleicher ID werden ersetzt, neue hinzugefügt
-      for (const t of neu.spiele) {
-        const i = daten.spiele.findIndex((x) => x.id === t.id);
-        if (i >= 0) daten.spiele[i] = t; else daten.spiele.push(t);
-      }
-      spiel = daten.spiele.find((t) => t.id === neu.aktiv) || daten.spiele[daten.spiele.length - 1];
-    } else if (Array.isArray(neu.spieler) && Array.isArray(neu.runden)) {
-      const t = { ...neueTabelle("Geladene Tabelle"), spieler: neu.spieler, runden: neu.runden };
-      daten.spiele.push(t);
-      spiel = t;
-    } else throw new Error();
-    speichern(); alles();
+    const tabellen = Array.isArray(neu.spiele) ? neu.spiele
+      : Array.isArray(neu.spieler) ? [{ name: "Geladene Tabelle", spieler: neu.spieler, runden: neu.runden || [] }]
+      : null;
+    if (!tabellen) throw new Error();
+    if (!confirm(`${tabellen.length} Tabelle(n) aus der Datei hochladen? Gleichnamige Tabellen aus derselben Sicherung werden dabei ersetzt.`)) return;
+    let letzte;
+    for (const t of tabellen) letzte = hochladen(t);
+    waehle(letzte);
+    alles();
   } catch { alert("Die Datei ist kein gültiger Spielstand."); }
   $("datei").value = "";
 });
@@ -508,8 +624,55 @@ let groesse;
 addEventListener("resize", () => { clearTimeout(groesse); groesse = setTimeout(zeichneDiagramm, 150); });
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", zeichneDiagramm);
 
+// ---------- Start: live mit der Datenbank verbinden ----------
+
+// Spielstand, der vor dem Umzug nur im Browser lag, einmalig hochladen
+async function alteDatenHochladen() {
+  const merker = "guinness-hochgeladen-" + SAMMLUNG;
+  try { if (localStorage.getItem(merker)) return; } catch { return; }
+  const quellen = [];
+  for (const k of [LIVE ? "guinness-spiel-v2" : "guinness-spiel-v2-test", LIVE ? "guinness-spiel-v1" : null]) {
+    if (!k) continue;
+    try { const d = JSON.parse(localStorage.getItem(k)); if (d) quellen.push(d); } catch {}
+  }
+  const tabellen = quellen.flatMap((d) => d.spiele || (d.spieler ? [{ name: heute(), spieler: d.spieler, runden: d.runden || [] }] : []))
+    .filter((t) => t.runden?.length);
+  for (const t of tabellen) hochladen(t);
+  try { localStorage.setItem(merker, "1"); } catch {}
+  return tabellen.length;
+}
+
+let ersteServerAntwort = true;
+zeigeStatus("laedt");
 alles();
+
+onSnapshot(collection(db, SAMMLUNG), { includeMetadataChanges: true }, async (snap) => {
+  daten.spiele = snap.docs.filter((d) => !d.data().geloescht)
+    .map((d) => ansichtAus(d.id, d.data()))
+    .sort((a, b) => a.erstellt - b.erstellt);
+  zeigeStatus(snap.metadata.hasPendingWrites ? "speichert" : snap.metadata.fromCache ? "offline" : "live");
+
+  if (ersteServerAntwort && !snap.metadata.fromCache) {
+    ersteServerAntwort = false;
+    const hochgeladen = await alteDatenHochladen();
+    if (!hochgeladen && !daten.spiele.length) {
+      aktivId = neueTabelleAnlegen(heute());
+      return; // die nächste Antwort der Datenbank enthält die neue Tabelle
+    }
+  }
+
+  waehle(aktivId);
+  // Tippt gerade jemand an diesem Gerät, nur Summen und Kurven auffrischen, die Tabelle danach
+  const tippt = $("tabelle").contains(document.activeElement) && document.activeElement.tagName === "INPUT";
+  if (tippt) {
+    spaeterZeichnen = true;
+    zeichneTabellen(); aktualisiereSummen();
+  } else {
+    alles();
+  }
+}, fehler);
 </script>
+
 <script>
 // Navigation aus seiten.json: die Action legt dort fest, welche Seiten freigegeben sind.
 // Ohne Datei (lokaler Server) werden alle Seiten gezeigt.
