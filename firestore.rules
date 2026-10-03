@@ -5,16 +5,26 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Great Guinness Game: jeder darf lesen und eintragen (so gewollt, der Link reicht).
-    // Eine Tabelle ist ein Dokument. Löschen geht nur als Markierung (geloescht: true),
-    // damit niemand mit einem Klick alles endgültig wegwischen kann.
+    // Ein Spiel ist ein Dokument. Gelöscht wird nichts: weder das Spiel noch Spieler oder Runden.
+    // Punkte und Spielernamen dürfen überschrieben werden.
     // „guinness“ = Live-Seite, „guinness-test“ = Test-Seite und lokaler Server
-    match /{sammlung}/{tabelle} {
+    match /{sammlung}/{spiel} {
       allow read: if sammlung in ['guinness', 'guinness-test'];
-      allow create, update: if sammlung in ['guinness', 'guinness-test']
-        && request.resource.data.keys().hasOnly(['name', 'erstellt', 'zeit', 'geloescht', 'spieler', 'runden'])
-        && request.resource.data.name is string
-        && request.resource.data.name.size() <= 60;
+      allow create: if sammlung in ['guinness', 'guinness-test'] && gueltig();
+      allow update: if sammlung in ['guinness', 'guinness-test'] && gueltig()
+        // kein Spieler und keine Runde darf verschwinden oder als gelöscht markiert werden
+        && request.resource.data.spieler.keys().hasAll(resource.data.spieler.keys())
+        && request.resource.data.runden.keys().hasAll(resource.data.runden.keys())
+        && request.resource.data.get('geloescht', false) == resource.data.get('geloescht', false);
       allow delete: if false;
+    }
+
+    function gueltig() {
+      return request.resource.data.keys().hasOnly(['name', 'erstellt', 'zeit', 'geloescht', 'spieler', 'runden'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 60
+        && request.resource.data.spieler is map
+        && request.resource.data.runden is map;
     }
 
     // Alles andere ist gesperrt, bis es eigene Regeln bekommt (z. B. die Personendaten).
