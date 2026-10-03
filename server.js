@@ -25,8 +25,9 @@ function body(req) {
 http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   try {
-    if (url.pathname === "/" || url.pathname === "/index.html") {
-      return sende(res, 200, fs.readFileSync(path.join(__dirname, "index.html")), "text/html; charset=utf-8");
+    if (url.pathname === "/" || /^\/[a-z-]+\.html$/.test(url.pathname)) {
+      const datei = path.join(__dirname, url.pathname === "/" ? "index.html" : url.pathname.slice(1));
+      if (fs.existsSync(datei)) return sende(res, 200, fs.readFileSync(datei), "text/html; charset=utf-8");
     }
     if (url.pathname === "/api/suche") {
       const q = (url.searchParams.get("q") || "").trim();

@@ -36,13 +36,15 @@ jobs:
       - name: Live-Fassung bauen
         run: |
           mkdir -p _site
-          cp live/index.html _site/
+          cp live/*.html _site/
           node live/tools/aktualisieren.js _site
 
       - name: Test-Fassung bauen
         run: |
           mkdir -p _site/test
-          sed 's#<head>#<head>\n<meta name="robots" content="noindex">#' testing/index.html > _site/test/index.html
+          for f in testing/*.html; do
+            sed 's#<head>#<head>\n<meta name="robots" content="noindex">#' "$f" > "_site/test/$(basename "$f")"
+          done
           node testing/tools/aktualisieren.js _site/test
 
       - uses: actions/configure-pages@v5

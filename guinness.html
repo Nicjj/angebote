@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Great Guinness Game</title>
+<style>
+  :root {
+    --bg: #f4f2ec; --karte: #ffffff; --text: #1b1b1b; --leise: #6b6b66; --linie: #e2e0d8;
+    --akzent: #9a7412; --akzent-text: #ffffff; --chip: #ecebe4; --gitter: #ecebe6;
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+    --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121211; --karte: #1f1f1d; --text: #f1eee4; --leise: #a29f94; --linie: #33332f;
+      --akzent: #d9b44a; --akzent-text: #121211; --chip: #2a2a27; --gitter: #2b2b28;
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+      --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 16px 16px 60px; }
+  nav.seiten { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+  nav.seiten a { color: var(--text); text-decoration: none; font-size: 14px; padding: 6px 12px;
+    border-radius: 999px; background: var(--chip); }
+  nav.seiten a[aria-current] { background: var(--text); color: var(--bg); }
+  h1 { font-size: 26px; margin: 0; letter-spacing: .01em; }
+  .unter { color: var(--leise); font-size: 14px; margin: 2px 0 16px; }
+  h2 { font-size: 19px; margin: 32px 0 10px; }
+
+  button { font: inherit; cursor: pointer; border: 0; border-radius: 10px; padding: 10px 16px;
+    background: var(--akzent); color: var(--akzent-text); font-weight: 600; }
+  button.leise { background: var(--chip); color: var(--text); font-weight: 500; }
+  button.klein { padding: 6px 12px; font-size: 14px; }
+  input[type=text] { font: inherit; padding: 10px 12px; border-radius: 10px; min-width: 0;
+    border: 1px solid var(--linie); background: var(--karte); color: var(--text); }
+  .leiste { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  form.neu { display: flex; gap: 8px; flex: 1 1 260px; max-width: 420px; }
+  form.neu input { flex: 1; }
+
+  /* Tabelle */
+  .tabelle { overflow-x: auto; margin-top: 14px; border: 1px solid var(--linie); border-radius: 12px; background: var(--karte); }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { border-bottom: 1px solid var(--linie); padding: 0; text-align: center; white-space: nowrap; }
+  th:first-child, td:first-child { position: sticky; left: 0; background: var(--karte); text-align: left; z-index: 1;
+    border-right: 1px solid var(--linie); }
+  thead th { font-size: 14px; padding: 8px 6px; vertical-align: bottom; }
+  .kopfname { display: flex; align-items: center; gap: 4px; justify-content: center; }
+  .punkt { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .zelle input, .name input { width: 100%; border: 0; background: transparent; color: var(--text); font: inherit;
+    padding: 10px 6px; text-align: center; border-radius: 0; }
+  .zelle input { min-width: 64px; }
+  .zelle input:focus, .name input:focus { outline: 2px solid var(--akzent); outline-offset: -2px; }
+  .name input { text-align: left; font-weight: 600; min-width: 110px; padding-right: 0; }
+  thead .name input { text-align: center; min-width: 70px; padding: 4px; }
+  .runde { display: flex; align-items: center; }
+  .datum { color: var(--leise); font-size: 12px; padding: 0 4px; }
+  .weg { background: none; color: var(--leise); padding: 4px 8px; font-size: 16px; line-height: 1; font-weight: 400; }
+  .weg:hover { color: var(--s8); }
+  tfoot td { font-weight: 700; padding: 10px 6px; font-size: 17px; border-bottom: 0; }
+  tfoot td:first-child { padding-left: 10px; }
+  tfoot .fuehrt { color: var(--akzent); }
+  tfoot .fuehrt::after { content: " ★"; }
+  .leer { color: var(--leise); font-size: 14px; padding: 18px; text-align: center; }
+
+  /* Diagramm */
+  .karte { background: var(--karte); border: 1px solid var(--linie); border-radius: 12px; padding: 14px; }
+  .umschalter { display: inline-flex; background: var(--chip); border-radius: 10px; padding: 3px; gap: 2px; }
+  .umschalter button { background: none; color: var(--text); font-weight: 500; padding: 6px 12px; font-size: 14px; border-radius: 8px; }
+  .umschalter button.an { background: var(--karte); box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+  .legende { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; color: var(--text); margin: 10px 0 4px; }
+  .legende span { display: inline-flex; align-items: center; gap: 6px; }
+  .legende .strich { width: 16px; height: 3px; border-radius: 2px; }
+  .diagramm { position: relative; }
+  .diagramm svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .diagramm text { fill: var(--leise); font-size: 12px; font-family: inherit; }
+  .diagramm .beschriftung { fill: var(--text); font-weight: 600; }
+  .tipp { position: absolute; pointer-events: none; background: var(--karte); border: 1px solid var(--linie);
+    border-radius: 10px; padding: 8px 10px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.18); min-width: 130px; }
+  .tipp b { display: block; margin-bottom: 4px; }
+  .tipp div { display: flex; align-items: center; gap: 6px; justify-content: space-between; }
+  .tipp div span:first-child { display: inline-flex; align-items: center; gap: 6px; }
+
+  /* Spielerkarten */
+  .spielerkarten { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .spielerkarte .kopf { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .spielerkarte .werte { display: flex; gap: 14px; font-size: 13px; color: var(--leise); margin: 6px 0 4px; }
+  .spielerkarte .werte b { display: block; color: var(--text); font-size: 18px; }
+  .spielerkarte svg { width: 100%; height: 48px; display: block; overflow: visible; }
+
+  @media (max-width: 560px) {
+    .datum { display: none; }
+    .name input { min-width: 74px; max-width: 96px; }
+    .zelle input { min-width: 44px; padding: 10px 2px; }
+    thead .name input { min-width: 44px; }
+    .weg { padding: 4px 4px; }
+  }
+
+  .verwalten { margin-top: 36px; display: flex; gap: 8px; flex-wrap: wrap; }
+  footer { color: var(--leise); font-size: 12px; margin-top: 18px; }
+</style>
+</head>
+<body>
+<main>
+  <nav class="seiten">
+    <a href="./">Angebote</a>
+    <a href="guinness.html" aria-current="page">Guinness-Spiel</a>
+  </nav>
+
+  <h1>The Great Guinness Game</h1>
+  <div class="unter">Jedes Guinness bringt Punkte. Wer am Ende vorne liegt, hat gewonnen.</div>
+
+  <div class="leiste">
+    <form class="neu" id="spielerForm">
+      <input type="text" id="spielerName" placeholder="Name des Spielers" autocomplete="off" maxlength="30">
+      <button class="leise">+ Spieler</button>
+    </form>
+    <button id="rundeNeu">+ Runde</button>
+  </div>
+
+  <div class="tabelle" id="tabelle"></div>
+
+  <h2>Leistungskurve</h2>
+  <div class="karte">
+    <div class="umschalter" id="ansicht">
+      <button type="button" data-a="gesamt" class="an">Gesamtpunkte</button>
+      <button type="button" data-a="runde">Punkte je Runde</button>
+    </div>
+    <div class="legende" id="legende"></div>
+    <div class="diagramm" id="diagramm"></div>
+  </div>
+
+  <h2>Spieler</h2>
+  <div class="spielerkarten" id="spielerkarten"></div>
+
+  <div class="verwalten">
+    <button class="leise klein" id="neuesSpiel">Neues Spiel</button>
+    <button class="leise klein" id="sichern">Spielstand sichern</button>
+    <button class="leise klein" id="laden">Spielstand laden</button>
+    <input type="file" id="datei" accept="application/json" hidden>
+  </div>
+  <footer>Der Spielstand wird nur in diesem Browser gespeichert. Mit „Spielstand sichern“ lädst du ihn als Datei herunter.</footer>
+</main>
+
+<script>
+const SPEICHER = "guinness-spiel-v1";
+const FARBEN = 8; // feste Reihenfolge --s1 … --s8, Farbe hängt am Spieler, nicht am Rang
+
+let spiel = { spieler: [], runden: [] };
+let ansicht = "gesamt";
+
+try { spiel = JSON.parse(localStorage.getItem(SPEICHER)) || spiel; } catch {}
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const id = () => Math.random().toString(36).slice(2, 10);
+const farbe = (s) => `var(--s${(s.farbe % FARBEN) + 1})`;
+const zahl = (n) => (Math.round(n * 100) / 100).toLocaleString("de-DE");
+const punkte = (runde, s) => Number(runde.punkte[s.id]) || 0;
+
+function speichern() {
+  try { localStorage.setItem(SPEICHER, JSON.stringify(spiel)); } catch {}
+}
+
+function summen() {
+  const gesamt = {};
+  for (const s of spiel.spieler) gesamt[s.id] = spiel.runden.reduce((a, r) => a + punkte(r, s), 0);
+  return gesamt;
+}
+
+// ---------- Tabelle ----------
+
+function zeichneTabelle() {
+  if (!spiel.spieler.length) {
+    $("tabelle").innerHTML = `<div class="leer">Leg los: Füge oben die Spieler hinzu, dann die erste Runde.</div>`;
+    return;
+  }
+  const gesamt = summen();
+  const bester = Math.max(...Object.values(gesamt));
+  const kopf = spiel.spieler.map((s) => `<th class="name"><div class="kopfname">
+      <span class="punkt" style="background:${farbe(s)}"></span>
+      <input value="${esc(s.name)}" data-spieler-name="${s.id}" aria-label="Name von ${esc(s.name)}" size="${Math.max(4, s.name.length)}">
+      <button class="weg" data-spieler-weg="${s.id}" title="${esc(s.name)} entfernen">×</button></div></th>`).join("");
+  const zeilen = spiel.runden.map((r) => `<tr>
+      <td class="name"><div class="runde">
+        <input value="${esc(r.name)}" data-runde-name="${r.id}" aria-label="Name der Runde">
+        <span class="datum">${new Date(r.datum).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}</span>
+        <button class="weg" data-runde-weg="${r.id}" title="Runde entfernen">×</button></div></td>
+      ${spiel.spieler.map((s) => `<td class="zelle"><input inputmode="decimal" data-runde="${r.id}" data-spieler="${s.id}"
+        value="${r.punkte[s.id] ?? ""}" aria-label="${esc(s.name)}, ${esc(r.name)}"></td>`).join("")}
+    </tr>`).join("");
+  const fuss = spiel.spieler.map((s) =>
+    `<td class="${spiel.runden.length && gesamt[s.id] === bester ? "fuehrt" : ""}" data-gesamt="${s.id}">${zahl(gesamt[s.id])}</td>`).join("");
+  $("tabelle").innerHTML = `<table>
+    <thead><tr><th>Runde</th>${kopf}</tr></thead>
+    <tbody>${zeilen || `<tr><td colspan="${spiel.spieler.length + 1}" class="leer">Noch keine Runde – tippe auf „+ Runde“.</td></tr>`}</tbody>
+    <tfoot><tr><td>Gesamt</td>${fuss}</tr></tfoot>
+  </table>`;
+}
+
+// Beim Tippen nur Summen und Kurven neu zeichnen, damit das Eingabefeld den Fokus behält
+function aktualisiereSummen() {
+  const gesamt = summen();
+  const bester = Math.max(...Object.values(gesamt));
+  for (const s of spiel.spieler) {
+    const td = document.querySelector(`[data-gesamt="${s.id}"]`);
+    if (!td) continue;
+    td.textContent = zahl(gesamt[s.id]);
+    td.className = spiel.runden.length && gesamt[s.id] === bester ? "fuehrt" : "";
+  }
+  zeichneDiagramm();
+  zeichneKarten();
+}
+
+// ---------- Diagramm ----------
+
+function reihen() {
+  return spiel.spieler.map((s) => {
+    let summe = 0;
+    const werte = ansicht === "gesamt"
+      ? [0, ...spiel.runden.map((r) => (summe += punkte(r, s)))]
+      : spiel.runden.map((r) => punkte(r, s));
+    return { s, werte };
+  });
+}
+
+function schoeneSkala(min, max) {
+  const spanne = Math.max(max - min, 1);
+  const roh = spanne / 4;
+  const p = Math.pow(10, Math.floor(Math.log10(roh)));
+  const schritt = [1, 2, 2.5, 5, 10].map((f) => f * p).find((s) => s >= roh);
+  return { unten: Math.floor(min / schritt) * schritt, oben: Math.ceil(max / schritt) * schritt, schritt };
+}
+
+function zeichneDiagramm() {
+  const ziel = $("diagramm");
+  const daten = reihen();
+  $("legende").innerHTML = spiel.spieler.length > 1
+    ? spiel.spieler.map((s) => `<span><span class="strich" style="background:${farbe(s)}"></span>${esc(s.name)}</span>`).join("")
+    : "";
+  const anzahl = ansicht === "gesamt" ? spiel.runden.length + 1 : spiel.runden.length;
+  if (!spiel.spieler.length || spiel.runden.length < 1) {
+    ziel.innerHTML = `<div class="leer">Die Kurve erscheint, sobald die erste Runde eingetragen ist.</div>`;
+    return;
+  }
+  const breite = Math.max(ziel.clientWidth, 280);
+  const hoehe = Math.round(Math.min(320, Math.max(220, breite * 0.45)));
+  const direkt = spiel.spieler.length <= 4; // bis 4 Spieler Namen direkt ans Linienende
+  const rand = { l: 40, r: direkt ? 84 : 14, o: 12, u: 28 };
+  const alle = daten.flatMap((d) => d.werte);
+  const sk = schoeneSkala(Math.min(0, ...alle), Math.max(...alle));
+  const x = (i) => rand.l + (anzahl === 1 ? (breite - rand.l - rand.r) / 2 : i * (breite - rand.l - rand.r) / (anzahl - 1));
+  const y = (v) => rand.o + (sk.oben - v) / (sk.oben - sk.unten || 1) * (hoehe - rand.o - rand.u);
+  const xBeschriftung = (i) => ansicht === "gesamt" ? (i === 0 ? "Start" : String(i)) : String(i + 1);
+
+  let svg = "";
+  for (let v = sk.unten; v <= sk.oben + 1e-9; v += sk.schritt) {
+    svg += `<line x1="${rand.l}" x2="${breite - rand.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--gitter)" stroke-width="1"/>
+      <text x="${rand.l - 8}" y="${y(v) + 4}" text-anchor="end">${zahl(v)}</text>`;
+  }
+  const jede = Math.ceil(anzahl / Math.floor((breite - rand.l - rand.r) / 34));
+  for (let i = 0; i < anzahl; i += jede) {
+    svg += `<text x="${x(i)}" y="${hoehe - 8}" text-anchor="middle">${xBeschriftung(i)}</text>`;
+  }
+  svg += `<line x1="${rand.l}" x2="${breite - rand.r}" y1="${y(0)}" y2="${y(0)}" stroke="var(--leise)" stroke-width="1" opacity=".5"/>`;
+  for (const d of daten) {
+    const punkteListe = d.werte.map((v, i) => `${x(i)},${y(v)}`).join(" ");
+    svg += `<polyline points="${punkteListe}" fill="none" stroke="${farbe(d.s)}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if (anzahl <= 24) {
+      svg += d.werte.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="4" fill="${farbe(d.s)}" stroke="var(--karte)" stroke-width="2"/>`).join("");
+    }
+  }
+  if (direkt) {
+    // Namen am Linienende, übereinanderliegende auseinanderschieben
+    const marken = daten.map((d) => ({ d, y: y(d.werte[d.werte.length - 1]) })).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < marken.length; i++) marken[i].y = Math.max(marken[i].y, marken[i - 1].y + 15);
+    for (const m of marken) {
+      svg += `<text class="beschriftung" x="${x(anzahl - 1) + 10}" y="${m.y + 4}">${esc(m.d.s.name.slice(0, 12))}</text>`;
+    }
+  }
+  svg += `<line id="fadenkreuz" y1="${rand.o}" y2="${hoehe - rand.u}" stroke="var(--leise)" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>
+    <rect id="fangflaeche" x="${rand.l - 10}" y="0" width="${breite - rand.l - rand.r + 20}" height="${hoehe}" fill="transparent"/>`;
+  ziel.innerHTML = `<svg viewBox="0 0 ${breite} ${hoehe}" role="img" aria-label="Leistungskurve aller Spieler">${svg}</svg><div class="tipp" hidden></div>`;
+
+  const flaeche = ziel.querySelector("#fangflaeche");
+  const kreuz = ziel.querySelector("#fadenkreuz");
+  const tipp = ziel.querySelector(".tipp");
+  const zeige = (ev) => {
+    const box = ziel.getBoundingClientRect();
+    const px = ((ev.touches ? ev.touches[0].clientX : ev.clientX) - box.left) * breite / box.width;
+    const i = Math.max(0, Math.min(anzahl - 1, Math.round(anzahl === 1 ? 0 : (px - rand.l) / ((breite - rand.l - rand.r) / (anzahl - 1)))));
+    kreuz.setAttribute("x1", x(i)); kreuz.setAttribute("x2", x(i)); kreuz.setAttribute("visibility", "visible");
+    const titel = ansicht === "gesamt"
+      ? (i === 0 ? "Start" : `Nach ${esc(spiel.runden[i - 1].name)}`)
+      : esc(spiel.runden[i].name);
+    tipp.innerHTML = `<b>${titel}</b>` + [...daten].sort((a, b) => b.werte[i] - a.werte[i]).map((d) =>
+      `<div><span><span class="punkt" style="background:${farbe(d.s)}"></span>${esc(d.s.name)}</span><span>${zahl(d.werte[i])}</span></div>`).join("");
+    tipp.hidden = false;
+    const links = x(i) * box.width / breite;
+    tipp.style.left = Math.min(Math.max(0, links + 12), box.width - tipp.offsetWidth) + "px";
+    if (links + 12 + tipp.offsetWidth > box.width) tipp.style.left = Math.max(0, links - tipp.offsetWidth - 12) + "px";
+    tipp.style.top = "8px";
+  };
+  const weg = () => { tipp.hidden = true; kreuz.setAttribute("visibility", "hidden"); };
+  flaeche.addEventListener("mousemove", zeige);
+  flaeche.addEventListener("touchstart", zeige, { passive: true });
+  flaeche.addEventListener("touchmove", zeige, { passive: true });
+  flaeche.addEventListener("mouseleave", weg);
+}
+
+// ---------- Spielerkarten mit eigener Kurve ----------
+
+function zeichneKarten() {
+  if (!spiel.spieler.length) { $("spielerkarten").innerHTML = ""; return; }
+  const gesamt = summen();
+  const rangfolge = [...spiel.spieler].sort((a, b) => gesamt[b.id] - gesamt[a.id]);
+  $("spielerkarten").innerHTML = rangfolge.map((s, platz) => {
+    const werte = spiel.runden.map((r) => punkte(r, s));
+    const schnitt = werte.length ? gesamt[s.id] / werte.length : 0;
+    const beste = werte.length ? Math.max(...werte) : 0;
+    let kurve = "";
+    if (werte.length > 1) {
+      let summe = 0;
+      const verlauf = werte.map((w) => (summe += w));
+      const min = Math.min(0, ...verlauf), max = Math.max(...verlauf, 1);
+      const pts = verlauf.map((v, i) => `${(i / (verlauf.length - 1)) * 196 + 2},${46 - ((v - min) / (max - min || 1)) * 42}`).join(" ");
+      kurve = `<svg viewBox="0 0 200 48" preserveAspectRatio="none" aria-hidden="true">
+        <polyline points="${pts}" fill="none" stroke="${farbe(s)}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
+    }
+    return `<div class="karte spielerkarte">
+      <div class="kopf"><span class="punkt" style="background:${farbe(s)}"></span>${platz + 1}. ${esc(s.name)}</div>
+      <div class="werte"><span><b>${zahl(gesamt[s.id])}</b>Gesamt</span><span><b>${zahl(schnitt)}</b>Schnitt</span><span><b>${zahl(beste)}</b>Beste Runde</span></div>
+      ${kurve}
+    </div>`;
+  }).join("");
+}
+
+function alles() { zeichneTabelle(); zeichneDiagramm(); zeichneKarten(); }
+
+// ---------- Eingaben ----------
+
+$("spielerForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const name = $("spielerName").value.trim();
+  if (!name) return;
+  const belegt = new Set(spiel.spieler.map((s) => s.farbe));
+  let f = 0; while (belegt.has(f) && f < FARBEN) f++;
+  spiel.spieler.push({ id: id(), name, farbe: f < FARBEN ? f : spiel.spieler.length });
+  $("spielerName").value = "";
+  speichern(); alles();
+});
+
+$("rundeNeu").addEventListener("click", () => {
+  if (!spiel.spieler.length) { $("spielerName").focus(); return; }
+  spiel.runden.push({ id: id(), name: "Runde " + (spiel.runden.length + 1), datum: new Date().toISOString(), punkte: {} });
+  speichern(); alles();
+  const letzte = spiel.runden[spiel.runden.length - 1];
+  document.querySelector(`[data-runde="${letzte.id}"]`)?.focus();
+});
+
+$("tabelle").addEventListener("input", (e) => {
+  const t = e.target;
+  if (t.dataset.runde) {
+    const r = spiel.runden.find((r) => r.id === t.dataset.runde);
+    const wert = t.value.replace(",", ".").trim();
+    if (wert === "" || wert === "-") delete r.punkte[t.dataset.spieler];
+    else if (!isNaN(Number(wert))) r.punkte[t.dataset.spieler] = Number(wert);
+    speichern(); aktualisiereSummen();
+  } else if (t.dataset.spielerName) {
+    spiel.spieler.find((s) => s.id === t.dataset.spielerName).name = t.value;
+    speichern(); zeichneDiagramm(); zeichneKarten();
+  } else if (t.dataset.rundeName) {
+    spiel.runden.find((r) => r.id === t.dataset.rundeName).name = t.value;
+    speichern();
+  }
+});
+
+// Enter springt in die Zelle darunter, wie in einer Tabellenkalkulation
+$("tabelle").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || !e.target.dataset.runde) return;
+  e.preventDefault();
+  const i = spiel.runden.findIndex((r) => r.id === e.target.dataset.runde);
+  const naechste = spiel.runden[i + 1];
+  if (naechste) document.querySelector(`[data-runde="${naechste.id}"][data-spieler="${e.target.dataset.spieler}"]`)?.focus();
+  else e.target.blur();
+});
+
+$("tabelle").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.spielerWeg) {
+    const s = spiel.spieler.find((s) => s.id === b.dataset.spielerWeg);
+    if (!confirm(`${s.name} mit allen Punkten entfernen?`)) return;
+    spiel.spieler = spiel.spieler.filter((x) => x !== s);
+    for (const r of spiel.runden) delete r.punkte[s.id];
+  } else if (b.dataset.rundeWeg) {
+    const r = spiel.runden.find((r) => r.id === b.dataset.rundeWeg);
+    if (Object.keys(r.punkte).length && !confirm(`${r.name} mit allen Punkten entfernen?`)) return;
+    spiel.runden = spiel.runden.filter((x) => x !== r);
+  } else return;
+  speichern(); alles();
+});
+
+$("ansicht").addEventListener("click", (e) => {
+  const a = e.target.dataset.a;
+  if (!a) return;
+  ansicht = a;
+  for (const b of $("ansicht").children) b.classList.toggle("an", b.dataset.a === a);
+  zeichneDiagramm();
+});
+
+$("neuesSpiel").addEventListener("click", () => {
+  if (!confirm("Neues Spiel starten? Alle Runden und Punkte werden gelöscht, die Spieler bleiben.")) return;
+  spiel.runden = [];
+  speichern(); alles();
+});
+
+$("sichern").addEventListener("click", () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(spiel, null, 2)], { type: "application/json" }));
+  a.download = "guinness-spiel-" + new Date().toISOString().slice(0, 10) + ".json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+$("laden").addEventListener("click", () => $("datei").click());
+$("datei").addEventListener("change", async () => {
+  const datei = $("datei").files[0];
+  if (!datei) return;
+  try {
+    const neu = JSON.parse(await datei.text());
+    if (!Array.isArray(neu.spieler) || !Array.isArray(neu.runden)) throw new Error();
+    if (spiel.runden.length && !confirm("Den aktuellen Spielstand durch die Datei ersetzen?")) return;
+    spiel = neu;
+    speichern(); alles();
+  } catch { alert("Die Datei ist kein gültiger Spielstand."); }
+  $("datei").value = "";
+});
+
+let groesse;
+addEventListener("resize", () => { clearTimeout(groesse); groesse = setTimeout(zeichneDiagramm, 150); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", zeichneDiagramm);
+
+alles();
+</script>
+</body>
+</html>

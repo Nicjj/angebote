@@ -19,6 +19,10 @@
   body { margin: 0; background: var(--bg); color: var(--text);
     font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   main { max-width: 860px; margin: 0 auto; padding: 20px 16px 60px; }
+  nav.seiten { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+  nav.seiten a { color: var(--text); text-decoration: none; font-size: 14px; padding: 6px 12px;
+    border-radius: 999px; background: var(--chip); }
+  nav.seiten a[aria-current] { background: var(--text); color: var(--bg); }
   h1 { font-size: 26px; margin: 0; }
   .orte { color: var(--leise); font-size: 14px; margin: 2px 0 16px; }
   h2 { font-size: 19px; margin: 32px 0 10px; }
@@ -85,6 +89,10 @@
 </head>
 <body>
 <main>
+  <nav class="seiten">
+    <a href="./" aria-current="page">Angebote</a>
+    <a href="guinness.html">Guinness-Spiel</a>
+  </nav>
   <h1>Angebote</h1>
   <div class="orte" id="orte">&nbsp;</div>
 
