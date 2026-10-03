@@ -105,6 +105,59 @@
   .info { font-size: 13px; color: var(--leise); margin: -6px 0 14px; }
   .rundenname { font-weight: 600; padding: 10px 4px 10px 10px; }
 
+  /* ---- Handy zuerst ---- */
+  main { padding-bottom: 40px; }
+  h1 { font-size: 24px; line-height: 1.15; }
+  h2 { margin: 26px 0 10px; }
+  /* iOS zoomt in Felder mit weniger als 16 px Schrift – deshalb überall 16 px */
+  input, .zelle input, .name input, thead .name input { font-size: 16px; }
+
+  .stand { display: grid; gap: 6px; margin-top: 4px; }
+  .stand .zeile { display: grid; grid-template-columns: 28px 12px 1fr auto; align-items: center; gap: 8px;
+    background: var(--karte); border: 1px solid var(--linie); border-radius: 12px; padding: 10px 12px; }
+  .stand .platz { color: var(--leise); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stand .wer { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stand .pkt { font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .stand .zeile.erster { border-color: var(--akzent); }
+  .stand .zeile.erster .pkt { color: var(--akzent); }
+  .stand .zeile.erster .pkt::after { content: " ★"; }
+
+  /* Tabelle: bis 6 Spieler passen ohne Wischen auf ein Handy */
+  table.kompakt { table-layout: fixed; }
+  table.kompakt th:first-child, table.kompakt td:first-child { width: 58px; }
+  table.kompakt .zelle input, table.kompakt thead .name input { min-width: 0; width: 100%; }
+  .kopfknopf { background: none; color: var(--text); padding: 2px 1px; font-size: 13px; font-weight: 600; line-height: 1.15;
+    border-radius: 6px; overflow-wrap: anywhere; hyphens: auto; max-width: 100%; }
+  .kopfknopf:active { background: var(--chip); }
+  @media (min-width: 640px) { .kopfknopf { font-size: 15px; } }
+  thead th { padding: 6px 2px; }
+  .kopfname { flex-direction: column; gap: 2px; }
+  .zelle input { height: 46px; padding: 0 2px; }
+  .runde { flex-direction: column; align-items: flex-start; padding: 4px 0 4px 10px; }
+  .rundenname { padding: 0; }
+  .runde .datum { padding: 0; font-size: 11px; }
+  tfoot td { padding: 12px 2px; }
+  @media (max-width: 560px) {
+    .rundenname .lang { display: none; }
+    .datum { display: block; }
+    tfoot td:first-child { font-size: 14px; }
+  }
+
+  /* „+ Neue Runde“ läuft unten am Bildschirm mit */
+  .aktion { position: sticky; bottom: 0; z-index: 3; padding: 10px 0 calc(10px + env(safe-area-inset-bottom));
+    background: linear-gradient(to bottom, transparent, var(--bg) 30%); }
+  .aktion button { width: 100%; padding: 14px; font-size: 17px; border-radius: 12px; }
+  form.neu { max-width: none; margin-top: 4px; }
+  form.neu button { white-space: nowrap; }
+
+  @media (min-width: 640px) {
+    h1 { font-size: 30px; }
+    .stand { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+    .aktion { position: static; background: none; }
+    .aktion button { width: auto; padding: 10px 22px; }
+    form.neu { max-width: 420px; }
+  }
+
   .verwalten { margin-top: 36px; display: flex; gap: 8px; flex-wrap: wrap; }
   footer { color: var(--leise); font-size: 12px; margin-top: 18px; }
 </style>
@@ -119,15 +172,18 @@
   <div class="status" id="status"></div>
   <div class="info" id="info"></div>
 
-  <div class="leiste">
-    <form class="neu" id="spielerForm">
-      <input type="text" id="spielerName" placeholder="Name des Spielers (nur Buchstaben)" autocomplete="off" maxlength="30" autocapitalize="words">
-      <button class="leise">+ Spieler</button>
-    </form>
-    <button id="rundeNeu">+ Runde</button>
+  <section class="stand" id="stand" aria-label="Aktueller Stand"></section>
+
+  <h2>Punkte</h2>
+  <div class="tabelle" id="tabelle"></div>
+  <div class="aktion">
+    <button id="rundeNeu" type="button">+ Neue Runde</button>
   </div>
 
-  <div class="tabelle" id="tabelle"></div>
+  <form class="neu" id="spielerForm">
+    <input type="text" id="spielerName" placeholder="Neuer Spieler" autocomplete="off" maxlength="30" autocapitalize="words" enterkeyhint="done">
+    <button class="leise">+ Spieler</button>
+  </form>
 
   <h2>Leistungskurve</h2>
   <div class="karte">
@@ -295,23 +351,25 @@ function zeichneTabelle() {
   const bester = Math.max(...Object.values(gesamt));
   const kopf = spiel.spieler.map((s) => `<th class="name"><div class="kopfname">
       <span class="punkt" style="background:${farbe(s)}"></span>
-      <input value="${esc(s.name)}" data-spieler-name="${s.id}" aria-label="Name von ${esc(s.name)}" size="${Math.max(4, s.name.length)}" autocapitalize="words"></div></th>`).join("");
+      <button type="button" class="kopfknopf" data-umbenennen="${s.id}" title="${esc(s.name)} umbenennen">${esc(s.name)}</button></div></th>`).join("");
   const zeilen = spiel.runden.map((r) => `<tr>
       <td class="name"><div class="runde">
-        <span class="rundenname">${esc(r.name)}</span>
+        <span class="rundenname">${/^Runde \d+$/.test(r.name) ? `<span class="lang">Runde </span>${esc(r.name.slice(6))}` : esc(r.name)}</span>
         <span class="datum">${new Date(r.datum).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}</span></div></td>
-      ${spiel.spieler.map((s) => `<td class="zelle"><input inputmode="numeric" pattern="[0-9]*" maxlength="4" data-runde="${r.id}" data-spieler="${s.id}"
+      ${spiel.spieler.map((s) => `<td class="zelle"><input inputmode="numeric" pattern="[0-9]*" maxlength="4" enterkeyhint="next" data-runde="${r.id}" data-spieler="${s.id}"
         value="${String(r.punkte[s.id] ?? "").replace(".", ",")}" aria-label="${esc(s.name)}, ${esc(r.name)}"></td>`).join("")}
     </tr>`).join("");
   const fuss = spiel.spieler.map((s) =>
     `<td class="${spiel.runden.length && gesamt[s.id] === bester ? "fuehrt" : ""}" data-gesamt="${s.id}">${zahl(gesamt[s.id])}</td>`).join("");
-  $("tabelle").innerHTML = `<table>
+  $("tabelle").innerHTML = `<table class="${spiel.spieler.length <= 6 ? "kompakt" : ""}">
     <thead><tr><th>Runde</th>${kopf}</tr></thead>
     <tbody>${zeilen || `<tr><td colspan="${spiel.spieler.length + 1}" class="leer">Noch keine Runde – tippe auf „+ Runde“.</td></tr>`}</tbody>
     <tfoot><tr><td>Gesamt</td>${fuss}</tr></tfoot>
   </table>`;
   if (fokusRunde && spiel.runden.some((r) => r.id === fokusRunde)) {
-    document.querySelector(`[data-runde="${fokusRunde}"]`)?.focus();
+    const feld = document.querySelector(`[data-runde="${fokusRunde}"]`);
+    feld?.focus();
+    feld?.scrollIntoView({ block: "center", behavior: "smooth" });
     fokusRunde = null;
   }
 }
@@ -327,6 +385,7 @@ function aktualisiereSummen() {
     td.textContent = zahl(gesamt[s.id]);
     td.className = spiel.runden.length && gesamt[s.id] === bester ? "fuehrt" : "";
   }
+  zeichneStand();
   zeichneDiagramm();
   zeichneKarten();
 }
@@ -454,11 +513,27 @@ function zeichneKarten() {
   }).join("");
 }
 
+function zeichneStand() {
+  if (!spiel || !spiel.spieler.length) { $("stand").innerHTML = ""; return; }
+  const gesamt = summen();
+  const liste = [...spiel.spieler].sort((a, b) => gesamt[b.id] - gesamt[a.id]);
+  const bester = gesamt[liste[0].id];
+  let platz = 0, vorher = null;
+  $("stand").innerHTML = liste.map((s, i) => {
+    if (gesamt[s.id] !== vorher) { platz = i + 1; vorher = gesamt[s.id]; } // gleiche Punkte, gleicher Platz
+    const erster = spiel.runden.length && gesamt[s.id] === bester;
+    return `<div class="zeile${erster ? " erster" : ""}"><span class="platz">${platz}.</span>
+      <span class="punkt" style="background:${farbe(s)}"></span><span class="wer">${esc(s.name)}</span>
+      <span class="pkt">${zahl(gesamt[s.id])}</span></div>`;
+  }).join("");
+}
+
 function alles() {
   zeichneTabellen();
+  zeichneStand();
   if (!spiel) {
     $("tabelle").innerHTML = `<div class="leer">Spielstand wird geladen …</div>`;
-    $("diagramm").innerHTML = $("legende").innerHTML = $("spielerkarten").innerHTML = "";
+    $("diagramm").innerHTML = $("legende").innerHTML = $("spielerkarten").innerHTML = $("stand").innerHTML = "";
     return;
   }
   zeichneTabelle(); zeichneDiagramm(); zeichneKarten();
@@ -521,20 +596,21 @@ $("tabelle").addEventListener("input", (e) => {
       schreibSpaeter(pfad, Number(wert));
     }
     aktualisiereSummen();
-  } else if (t.dataset.spielerName) {
-    const s = spiel.spieler.find((s) => s.id === t.dataset.spielerName);
-    const name = bereinige(t, nurBuchstaben).trim().slice(0, 30);
-    if (!name) return; // ein Name bleibt immer stehen, leer wird nicht gespeichert
-    s.name = name;
-    schreibSpaeter(`spieler.${s.id}.name`, s.name);
-    zeichneDiagramm(); zeichneKarten();
   }
 });
 
-// Leer gelassenen Namen beim Verlassen wiederherstellen
-$("tabelle").addEventListener("change", (e) => {
-  const t = e.target;
-  if (t.dataset.spielerName && !t.value.trim()) t.value = spiel.spieler.find((s) => s.id === t.dataset.spielerName)?.name || "";
+// Spieler umbenennen: Namen im Tabellenkopf antippen. Leer oder abgebrochen bleibt der alte Name.
+$("tabelle").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-umbenennen]");
+  if (!b) return;
+  const s = spiel.spieler.find((s) => s.id === b.dataset.umbenennen);
+  const eingabe = prompt("Neuer Name für " + s.name + " (nur Buchstaben):", s.name);
+  if (eingabe === null) return;
+  const name = nurBuchstaben(eingabe).trim().slice(0, 30);
+  if (!name || name === s.name) return;
+  s.name = name;
+  schreib({ [`spieler.${s.id}.name`]: name });
+  alles();
 });
 
 // Erst neu zeichnen, wenn niemand mehr in der Tabelle tippt
