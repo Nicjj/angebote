@@ -99,19 +99,28 @@
     .weg { padding: 4px 4px; }
   }
 
+  .tabellen { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .tabellen button.tab { background: var(--chip); color: var(--text); font-weight: 500; padding: 7px 14px; font-size: 14px; border-radius: 999px; }
+  .tabellen button.tab.an { background: var(--akzent); color: var(--akzent-text); font-weight: 600; }
+  .titelzeile { display: flex; gap: 8px; align-items: center; margin: 4px 0 12px; flex-wrap: wrap; }
+  .titelzeile input { font-size: 19px; font-weight: 700; flex: 1 1 200px; max-width: 420px; }
+
   .verwalten { margin-top: 36px; display: flex; gap: 8px; flex-wrap: wrap; }
   footer { color: var(--leise); font-size: 12px; margin-top: 18px; }
 </style>
 </head>
 <body>
 <main>
-  <nav class="seiten">
-    <a href="./">Angebote</a>
-    <a href="guinness.html" aria-current="page">Guinness-Spiel</a>
-  </nav>
+  <nav class="seiten" id="seiten"></nav>
 
   <h1>The Great Guinness Game</h1>
   <div class="unter">Jedes Guinness bringt Punkte. Wer am Ende vorne liegt, hat gewonnen.</div>
+
+  <div class="tabellen" id="tabellen"></div>
+  <div class="titelzeile">
+    <input type="text" id="tabelleName" aria-label="Name der Tabelle" maxlength="40">
+    <button class="leise klein" id="tabelleWeg">Tabelle löschen</button>
+  </div>
 
   <div class="leiste">
     <form class="neu" id="spielerForm">
@@ -137,22 +146,35 @@
   <div class="spielerkarten" id="spielerkarten"></div>
 
   <div class="verwalten">
-    <button class="leise klein" id="neuesSpiel">Neues Spiel</button>
     <button class="leise klein" id="sichern">Spielstand sichern</button>
     <button class="leise klein" id="laden">Spielstand laden</button>
     <input type="file" id="datei" accept="application/json" hidden>
   </div>
-  <footer>Der Spielstand wird nur in diesem Browser gespeichert. Mit „Spielstand sichern“ lädst du ihn als Datei herunter.</footer>
+  <footer>Alle Tabellen werden nur in diesem Browser gespeichert, also am besten immer am selben Handy eintragen. Mit „Spielstand sichern“ lädst du sie als Datei herunter.</footer>
 </main>
 
 <script>
-const SPEICHER = "guinness-spiel-v1";
+// Test- und Live-Seite liegen auf derselben Domain: getrennte Speicherplätze, damit ein Test nie das echte Spiel überschreibt
+const SPEICHER = "guinness-spiel-v2" + (location.pathname.includes("/test/") ? "-test" : "");
 const FARBEN = 8; // feste Reihenfolge --s1 … --s8, Farbe hängt am Spieler, nicht am Rang
 
-let spiel = { spieler: [], runden: [] };
+// Mehrere Tabellen; spiel zeigt immer auf die gerade offene
+let daten = null;
+let spiel;
 let ansicht = "gesamt";
 
-try { spiel = JSON.parse(localStorage.getItem(SPEICHER)) || spiel; } catch {}
+const neueTabelle = (name, spieler = []) =>
+  ({ id: Math.random().toString(36).slice(2, 10), name, spieler, runden: [] });
+
+try { daten = JSON.parse(localStorage.getItem(SPEICHER)); } catch {}
+if (!daten?.spiele?.length) {
+  let alt = null; // Spielstand aus der ersten Fassung übernehmen
+  try { alt = JSON.parse(localStorage.getItem("guinness-spiel-v1")); } catch {}
+  const erste = neueTabelle("Guinness-Abend " + new Date().toLocaleDateString("de-DE"));
+  if (alt?.spieler) Object.assign(erste, { spieler: alt.spieler, runden: alt.runden || [] });
+  daten = { aktiv: erste.id, spiele: [erste] };
+}
+spiel = daten.spiele.find((t) => t.id === daten.aktiv) || daten.spiele[0];
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -162,7 +184,15 @@ const zahl = (n) => (Math.round(n * 100) / 100).toLocaleString("de-DE");
 const punkte = (runde, s) => Number(runde.punkte[s.id]) || 0;
 
 function speichern() {
-  try { localStorage.setItem(SPEICHER, JSON.stringify(spiel)); } catch {}
+  daten.aktiv = spiel.id;
+  try { localStorage.setItem(SPEICHER, JSON.stringify(daten)); } catch {}
+}
+
+function zeichneTabellen() {
+  $("tabellen").innerHTML = daten.spiele.map((t) =>
+    `<button type="button" class="tab${t === spiel ? " an" : ""}" data-tabelle="${t.id}">${esc(t.name || "Ohne Namen")}</button>`).join("")
+    + `<button type="button" class="leise klein" id="tabelleNeu">+ Neue Tabelle</button>`;
+  if (document.activeElement !== $("tabelleName")) $("tabelleName").value = spiel.name;
 }
 
 function summen() {
@@ -338,7 +368,37 @@ function zeichneKarten() {
   }).join("");
 }
 
-function alles() { zeichneTabelle(); zeichneDiagramm(); zeichneKarten(); }
+function alles() { zeichneTabellen(); zeichneTabelle(); zeichneDiagramm(); zeichneKarten(); }
+
+$("tabellen").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.tabelle) {
+    spiel = daten.spiele.find((t) => t.id === b.dataset.tabelle);
+  } else if (b.id === "tabelleNeu") {
+    const name = prompt("Name der neuen Tabelle:", "Guinness-Abend " + new Date().toLocaleDateString("de-DE"));
+    if (name === null) return;
+    const mitSpielern = spiel.spieler.length && confirm("Die Spieler aus „" + spiel.name + "“ übernehmen?");
+    const neu = neueTabelle(name.trim() || "Neue Tabelle",
+      mitSpielern ? spiel.spieler.map((s) => ({ ...s })) : []);
+    daten.spiele.push(neu);
+    spiel = neu;
+  } else return;
+  speichern(); alles();
+});
+
+$("tabelleName").addEventListener("input", () => {
+  spiel.name = $("tabelleName").value;
+  speichern(); zeichneTabellen();
+});
+
+$("tabelleWeg").addEventListener("click", () => {
+  if (!confirm("Tabelle „" + spiel.name + "“ mit allen Runden und Punkten löschen?")) return;
+  daten.spiele = daten.spiele.filter((t) => t !== spiel);
+  if (!daten.spiele.length) daten.spiele.push(neueTabelle("Guinness-Abend " + new Date().toLocaleDateString("de-DE")));
+  spiel = daten.spiele[daten.spiele.length - 1];
+  speichern(); alles();
+});
 
 // ---------- Eingaben ----------
 
@@ -412,15 +472,10 @@ $("ansicht").addEventListener("click", (e) => {
   zeichneDiagramm();
 });
 
-$("neuesSpiel").addEventListener("click", () => {
-  if (!confirm("Neues Spiel starten? Alle Runden und Punkte werden gelöscht, die Spieler bleiben.")) return;
-  spiel.runden = [];
-  speichern(); alles();
-});
 
 $("sichern").addEventListener("click", () => {
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(spiel, null, 2)], { type: "application/json" }));
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(daten, null, 2)], { type: "application/json" }));
   a.download = "guinness-spiel-" + new Date().toISOString().slice(0, 10) + ".json";
   a.click();
   URL.revokeObjectURL(a.href);
@@ -432,9 +487,18 @@ $("datei").addEventListener("change", async () => {
   if (!datei) return;
   try {
     const neu = JSON.parse(await datei.text());
-    if (!Array.isArray(neu.spieler) || !Array.isArray(neu.runden)) throw new Error();
-    if (spiel.runden.length && !confirm("Den aktuellen Spielstand durch die Datei ersetzen?")) return;
-    spiel = neu;
+    if (Array.isArray(neu.spiele)) {
+      // komplette Sicherung: vorhandene Tabellen gleicher ID werden ersetzt, neue hinzugefügt
+      for (const t of neu.spiele) {
+        const i = daten.spiele.findIndex((x) => x.id === t.id);
+        if (i >= 0) daten.spiele[i] = t; else daten.spiele.push(t);
+      }
+      spiel = daten.spiele.find((t) => t.id === neu.aktiv) || daten.spiele[daten.spiele.length - 1];
+    } else if (Array.isArray(neu.spieler) && Array.isArray(neu.runden)) {
+      const t = { ...neueTabelle("Geladene Tabelle"), spieler: neu.spieler, runden: neu.runden };
+      daten.spiele.push(t);
+      spiel = t;
+    } else throw new Error();
     speichern(); alles();
   } catch { alert("Die Datei ist kein gültiger Spielstand."); }
   $("datei").value = "";
@@ -445,6 +509,19 @@ addEventListener("resize", () => { clearTimeout(groesse); groesse = setTimeout(z
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", zeichneDiagramm);
 
 alles();
+</script>
+<script>
+// Navigation aus seiten.json: die Action legt dort fest, welche Seiten freigegeben sind.
+// Ohne Datei (lokaler Server) werden alle Seiten gezeigt.
+(async () => {
+  let seiten = null;
+  try { const r = await fetch("seiten.json", { cache: "no-store" }); if (r.ok) seiten = await r.json(); } catch {}
+  seiten ||= [{ href: "./", name: "Angebote" }, { href: "guinness.html", name: "Guinness-Spiel" }];
+  const nav = document.getElementById("seiten");
+  if (seiten.length < 2) return nav.remove();
+  const hier = location.pathname.split("/").pop() || "./";
+  nav.innerHTML = seiten.map((s) => `<a href="${s.href}"${s.href === hier || (hier === "index.html" && s.href === "./") ? ' aria-current="page"' : ""}>${s.name}</a>`).join("");
+})();
 </script>
 </body>
 </html>

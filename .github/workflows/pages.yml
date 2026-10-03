@@ -1,7 +1,7 @@
 name: Seite veröffentlichen
 
-# live  → https://nicjj.github.io/angebote/
-# testing → https://nicjj.github.io/angebote/test/
+# live  → https://nicjj.github.io/angebote/       nur das Guinness-Spiel (Angebote und Personen gesperrt)
+# testing → https://nicjj.github.io/angebote/test/  alle Seiten, noindex
 # Beide Fassungen werden bei jedem Lauf gemeinsam gebaut, weil GitHub Pages nur eine Seite je Repo kennt.
 on:
   push:
@@ -33,11 +33,14 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
 
+      # Auf live ist vorerst nur das Guinness-Spiel freigegeben (Wunsch vom 03.10.2026).
+      # Zum Freigeben weiterer Seiten: hier kopieren, in seiten.json eintragen und aktualisieren.js aufrufen.
       - name: Live-Fassung bauen
         run: |
           mkdir -p _site
-          cp live/*.html _site/
-          node live/tools/aktualisieren.js _site
+          cp live/guinness.html _site/index.html
+          cp live/guinness.html _site/guinness.html
+          echo '[]' > _site/seiten.json
 
       - name: Test-Fassung bauen
         run: |
@@ -45,6 +48,7 @@ jobs:
           for f in testing/*.html; do
             sed 's#<head>#<head>\n<meta name="robots" content="noindex">#' "$f" > "_site/test/$(basename "$f")"
           done
+          echo '[{"href":"./","name":"Angebote"},{"href":"guinness.html","name":"Guinness-Spiel"}]' > _site/test/seiten.json
           node testing/tools/aktualisieren.js _site/test
 
       - uses: actions/configure-pages@v5

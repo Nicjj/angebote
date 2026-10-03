@@ -89,10 +89,7 @@
 </head>
 <body>
 <main>
-  <nav class="seiten">
-    <a href="./" aria-current="page">Angebote</a>
-    <a href="guinness.html">Guinness-Spiel</a>
-  </nav>
+  <nav class="seiten" id="seiten"></nav>
   <h1>Angebote</h1>
   <div class="orte" id="orte">&nbsp;</div>
 
@@ -388,6 +385,19 @@ async function statischLaden() {
   zeichneMerkliste();
   // Alle Merklisten-Begriffe gleichzeitig abfragen, jeder erscheint, sobald er da ist
   await Promise.all(merkliste.map((b) => hole(b).then(zeichneMerkliste)));
+})();
+</script>
+<script>
+// Navigation aus seiten.json: die Action legt dort fest, welche Seiten freigegeben sind.
+// Ohne Datei (lokaler Server) werden alle Seiten gezeigt.
+(async () => {
+  let seiten = null;
+  try { const r = await fetch("seiten.json", { cache: "no-store" }); if (r.ok) seiten = await r.json(); } catch {}
+  seiten ||= [{ href: "./", name: "Angebote" }, { href: "guinness.html", name: "Guinness-Spiel" }];
+  const nav = document.getElementById("seiten");
+  if (seiten.length < 2) return nav.remove();
+  const hier = location.pathname.split("/").pop() || "./";
+  nav.innerHTML = seiten.map((s) => `<a href="${s.href}"${s.href === hier || (hier === "index.html" && s.href === "./") ? ' aria-current="page"' : ""}>${s.name}</a>`).join("");
 })();
 </script>
 </body>
