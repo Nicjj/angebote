@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bilder</title>
+<style>
+  :root {
+    --bg: #f4f2ec; --karte: #ffffff; --text: #1b1b1b; --leise: #6b6b66; --linie: #e2e0d8;
+    --akzent: #9a7412; --akzent-text: #ffffff; --chip: #ecebe4; --dropbox: #0061fe; --gut: #1baf7a; --schlecht: #e34948;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121211; --karte: #1f1f1d; --text: #f1eee4; --leise: #a29f94; --linie: #33332f;
+      --akzent: #d9b44a; --akzent-text: #121211; --chip: #2a2a27; --dropbox: #4d8dff; --gut: #199e70; --schlecht: #e66767;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px 16px 60px; }
+  nav.seiten { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+  nav.seiten a { color: var(--text); text-decoration: none; font-size: 14px; padding: 6px 12px;
+    border-radius: 999px; background: var(--chip); }
+  nav.seiten a[aria-current] { background: var(--text); color: var(--bg); }
+  h1 { font-size: 24px; line-height: 1.15; margin: 0; }
+  .unter { color: var(--leise); font-size: 14px; margin: 2px 0 6px; }
+  .status { font-size: 13px; color: var(--leise); margin-bottom: 16px; }
+  .status[data-z="live"] { color: var(--gut); }
+  .status[data-z="fehler"] { color: var(--schlecht); font-weight: 600; }
+
+  button { font: inherit; cursor: pointer; border: 0; border-radius: 12px; padding: 12px 18px;
+    background: var(--akzent); color: var(--akzent-text); font-weight: 600; }
+  button.leise { background: var(--chip); color: var(--text); font-weight: 500; }
+  #neu { width: 100%; padding: 14px; font-size: 17px; }
+
+  /* Liste: neueste oben */
+  .liste { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; }
+  .liste a { display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center;
+    background: var(--karte); border: 1px solid var(--linie); border-radius: 12px; padding: 12px;
+    color: var(--text); text-decoration: none; min-height: 64px; }
+  .liste a:active { background: var(--chip); }
+  .symbol { width: 40px; height: 40px; border-radius: 10px; background: var(--chip); display: grid; place-items: center; }
+  .symbol svg { width: 22px; height: 22px; }
+  .symbol.dropbox { color: var(--dropbox); }
+  .symbol.anders { color: var(--leise); }
+  .titel { font-weight: 600; overflow-wrap: anywhere; }
+  .meta { color: var(--leise); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pfeil { color: var(--leise); font-size: 20px; }
+  .leer { color: var(--leise); font-size: 14px; padding: 24px 12px; text-align: center;
+    border: 1px dashed var(--linie); border-radius: 12px; margin-top: 18px; }
+
+  /* Fenster zum Hinzufügen: auf dem Handy von unten, am Computer mittig */
+  dialog { border: 0; padding: 0; background: var(--karte); color: var(--text); width: 100%; max-width: 480px;
+    border-radius: 16px 16px 0 0; margin: auto auto 0; box-shadow: 0 -8px 30px rgba(0,0,0,.3); }
+  dialog::backdrop { background: rgba(0,0,0,.55); }
+  dialog form { padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); display: grid; gap: 12px; }
+  dialog h2 { margin: 0; font-size: 19px; }
+  label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
+  input { font: inherit; font-size: 16px; padding: 12px; border-radius: 10px; width: 100%;
+    border: 1px solid var(--linie); background: var(--bg); color: var(--text); font-weight: 400; }
+  input:focus { outline: 2px solid var(--akzent); outline-offset: 0; }
+  .hinweis { font-size: 13px; color: var(--leise); font-weight: 400; }
+  .fehler { font-size: 13px; color: var(--schlecht); min-height: 1em; margin: -4px 0 0; }
+  .knoepfe { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-top: 4px; }
+
+  @media (min-width: 640px) {
+    h1 { font-size: 30px; }
+    #neu { width: auto; }
+    dialog { border-radius: 16px; margin: auto; }
+  }
+  footer { color: var(--leise); font-size: 12px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<main>
+  <nav class="seiten" id="seiten"></nav>
+
+  <h1>Bilder</h1>
+  <div class="unter">Links zu unseren Fotos und Alben, die neuesten oben.</div>
+  <div class="status" id="status">Verbinde …</div>
+
+  <button type="button" id="neu">+ Link hinzufügen</button>
+
+  <ul class="liste" id="liste" aria-label="Links zu Bildern"></ul>
+
+  <footer>Alle Links werden online gespeichert und sind für jeden mit dieser Seite sichtbar.</footer>
+</main>
+
+<dialog id="fenster" aria-labelledby="fensterTitel">
+  <form id="formular" method="dialog" novalidate>
+    <h2 id="fensterTitel">Link hinzufügen</h2>
+    <label>Name
+      <input type="text" id="name" maxlength="60" autocomplete="off" autocapitalize="sentences" enterkeyhint="next"
+        placeholder="z. B. Pubabend Oktober" required>
+    </label>
+    <label>Link
+      <input type="url" id="url" maxlength="1000" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url"
+        enterkeyhint="done" placeholder="https://www.dropbox.com/…" required>
+      <span class="hinweis">In Dropbox beim Ordner oder Bild auf „Teilen“ → „Link kopieren“ und hier einfügen.</span>
+    </label>
+    <p class="fehler" id="fehler" role="alert"></p>
+    <div class="knoepfe">
+      <button type="button" class="leise" id="abbrechen">Abbrechen</button>
+      <button type="submit" id="speichern">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import {
+  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  collection, query, orderBy, onSnapshot, addDoc, serverTimestamp,
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+
+// Öffentliche Web-Konfiguration des Firebase-Projekts (kein Geheimnis, der Schutz liegt in firestore.rules)
+const app = initializeApp({
+  apiKey: "AIzaSyBXh_TvYQYvc5DlCOiSM6dLbY3RrAPCNWU",
+  authDomain: "great-guinness-game.firebaseapp.com",
+  projectId: "great-guinness-game",
+  storageBucket: "great-guinness-game.firebasestorage.app",
+  messagingSenderId: "73739133293",
+  appId: "1:73739133293:web:c432f21baf25e8f2203a64",
+});
+const db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+
+// Live-Seite schreibt in „bilderlinks“, Test-Seite und lokaler Server in „bilderlinks-test“
+const LIVE = location.hostname.endsWith("github.io") && !location.pathname.includes("/test/");
+const SAMMLUNG = LIVE ? "bilderlinks" : "bilderlinks-test";
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const SYMBOL_DROPBOX = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 2 0 6l6 4 6-4-6-4Zm12 0-6 4 6 4 6-4-6-4ZM0 14l6 4 6-4-6-4-6 4Zm18-4-6 4 6 4 6-4-6-4ZM6 19.3l6 3.7 6-3.7-6-4-6 4Z"/></svg>`;
+const SYMBOL_LINK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>`;
+
+function zeigeStatus(z) {
+  const texte = {
+    live: "● Live – alle sehen dieselben Links",
+    offline: "Offline – neue Links werden gespeichert, sobald wieder Netz da ist",
+    speichert: "Speichert …",
+    fehler: "Verbindung fehlgeschlagen – bitte Seite neu laden",
+  };
+  $("status").textContent = texte[z];
+  $("status").dataset.z = z;
+}
+
+// Eingabe prüfen: Name nötig, Link muss eine echte Web-Adresse sein. „https://“ wird ergänzt, falls es fehlt.
+function pruefe() {
+  const name = $("name").value.trim().replace(/\s+/g, " ");
+  let url = $("url").value.trim();
+  if (!name) return { fehler: "Bitte gib dem Link einen Namen.", feld: "name" };
+  if (!url) return { fehler: "Bitte füge einen Link ein.", feld: "url" };
+  if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+  let adresse;
+  try { adresse = new URL(url); } catch { return { fehler: "Das ist kein gültiger Link.", feld: "url" }; }
+  if (!adresse.hostname.includes(".")) return { fehler: "Das ist kein gültiger Link.", feld: "url" };
+  adresse.protocol = "https:";
+  return { name: name.slice(0, 60), url: adresse.href.slice(0, 1000) };
+}
+
+const istDropbox = (url) => { try { return /(^|\.)dropbox\.com$/i.test(new URL(url).hostname) || /(^|\.)db\.tt$/i.test(new URL(url).hostname); } catch { return false; } };
+const wann = (d) => d ? d.toLocaleDateString("de-DE", { day: "numeric", month: "long", year: "numeric" }) : "gerade eben";
+
+function zeichne(links) {
+  if (!links.length) {
+    $("liste").innerHTML = "";
+    $("liste").insertAdjacentHTML("afterend", "");
+    $("liste").innerHTML = `<li class="leer">Noch keine Links. Tippe auf „+ Link hinzufügen“.</li>`;
+    return;
+  }
+  $("liste").innerHTML = links.map((l) => {
+    const dropbox = istDropbox(l.url);
+    const quelle = dropbox ? "Dropbox" : (() => { try { return new URL(l.url).hostname.replace(/^www\./, ""); } catch { return ""; } })();
+    return `<li><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">
+      <span class="symbol ${dropbox ? "dropbox" : "anders"}">${dropbox ? SYMBOL_DROPBOX : SYMBOL_LINK}</span>
+      <span><span class="titel">${esc(l.name)}</span><br><span class="meta">${esc(quelle)} · ${wann(l.erstellt?.toDate?.())}</span></span>
+      <span class="pfeil" aria-hidden="true">›</span></a></li>`;
+  }).join("");
+}
+
+// ---------- Fenster ----------
+
+$("neu").addEventListener("click", () => {
+  $("formular").reset();
+  $("fehler").textContent = "";
+  $("fenster").showModal();
+  $("name").focus();
+});
+$("abbrechen").addEventListener("click", () => $("fenster").close());
+// Tippen auf den abgedunkelten Hintergrund schließt das Fenster
+$("fenster").addEventListener("click", (e) => { if (e.target === $("fenster")) $("fenster").close(); });
+
+$("formular").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const eintrag = pruefe();
+  if (eintrag.fehler) {
+    $("fehler").textContent = eintrag.fehler;
+    $(eintrag.feld).focus();
+    return;
+  }
+  zeigeStatus("speichert");
+  // Ohne Netz nicht auf die Antwort warten: der Zwischenspeicher reicht den Link später nach
+  addDoc(collection(db, SAMMLUNG), { name: eintrag.name, url: eintrag.url, erstellt: serverTimestamp() })
+    .catch((err) => { console.error(err); zeigeStatus("fehler"); });
+  $("fenster").close();
+});
+
+// ---------- Live-Liste ----------
+
+onSnapshot(
+  query(collection(db, SAMMLUNG), orderBy("erstellt", "desc")),
+  { includeMetadataChanges: true },
+  (snap) => {
+    // Gerade erst gespeicherte Links haben noch keine Serverzeit – sie gehören ganz nach oben
+    const links = snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }));
+    zeichne(links);
+    zeigeStatus(snap.metadata.hasPendingWrites ? "speichert" : snap.metadata.fromCache ? "offline" : "live");
+  },
+  (err) => { console.error(err); zeigeStatus("fehler"); },
+);
+</script>
+<script>
+// Navigation aus seiten.json: die Action legt dort fest, welche Seiten freigegeben sind.
+// Ohne Datei (lokaler Server) werden alle Seiten gezeigt.
+(async () => {
+  let seiten = null;
+  try { const r = await fetch("seiten.json", { cache: "no-store" }); if (r.ok) seiten = await r.json(); } catch {}
+  seiten ||= [{ href: "./", name: "Start" }, { href: "guinness.html", name: "Guinness-Spiel" }, { href: "bilder.html", name: "Zu den Bildern" }, { href: "angebote.html", name: "Angebote" }];
+  const nav = document.getElementById("seiten");
+  if (seiten.length < 2) return nav.remove();
+  const hier = location.pathname.split("/").pop() || "./";
+  nav.innerHTML = seiten.map((s) => `<a href="${s.href}"${s.href === hier || (hier === "index.html" && s.href === "./") ? ' aria-current="page"' : ""}>${s.name}</a>`).join("");
+})();
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 name: Seite veröffentlichen
 
-# live  → https://nicjj.github.io/angebote/       nur das Guinness-Spiel (Angebote und Personen gesperrt)
+# live  → https://nicjj.github.io/angebote/       Startseite, Guinness-Spiel, Bilder (Angebote und Datensätze gesperrt)
 # testing → https://nicjj.github.io/angebote/test/  alle Seiten, noindex
 # Beide Fassungen werden bei jedem Lauf gemeinsam gebaut, weil GitHub Pages nur eine Seite je Repo kennt.
 on:
@@ -33,14 +33,14 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
 
-      # Auf live ist vorerst nur das Guinness-Spiel freigegeben (Wunsch vom 03.10.2026).
-      # Zum Freigeben weiterer Seiten: hier kopieren, in seiten.json eintragen und aktualisieren.js aufrufen.
+      # Auf live freigegeben: Startseite, Guinness-Spiel, Bilder (Stand 04.10.2026).
+      # Zum Freigeben weiterer Seiten: Datei hier kopieren und in seiten.json eintragen
+      # (seiten.json steuert Menü und anklickbare Kästen der Startseite). Für die Angebote zusätzlich aktualisieren.js aufrufen.
       - name: Live-Fassung bauen
         run: |
           mkdir -p _site
-          cp live/guinness.html _site/index.html
-          cp live/guinness.html _site/guinness.html
-          echo '[]' > _site/seiten.json
+          for f in index guinness bilder; do cp "live/$f.html" _site/; done
+          echo '[{"href":"./","name":"Start"},{"href":"guinness.html","name":"Guinness-Spiel"},{"href":"bilder.html","name":"Zu den Bildern"}]' > _site/seiten.json
 
       - name: Test-Fassung bauen
         run: |
@@ -48,7 +48,7 @@ jobs:
           for f in testing/*.html; do
             sed 's#<head>#<head>\n<meta name="robots" content="noindex">#' "$f" > "_site/test/$(basename "$f")"
           done
-          echo '[{"href":"./","name":"Angebote"},{"href":"guinness.html","name":"Guinness-Spiel"}]' > _site/test/seiten.json
+          echo '[{"href":"./","name":"Start"},{"href":"guinness.html","name":"Guinness-Spiel"},{"href":"bilder.html","name":"Zu den Bildern"},{"href":"angebote.html","name":"Angebote"}]' > _site/test/seiten.json
           node testing/tools/aktualisieren.js _site/test
 
       - uses: actions/configure-pages@v5

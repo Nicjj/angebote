@@ -19,6 +19,21 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Bilder: Links zu Fotos (meist Dropbox). Jeder darf lesen und hinzufügen, nichts ändern oder löschen.
+    // „bilderlinks“ = Live-Seite, „bilderlinks-test“ = Test-Seite und lokaler Server
+    match /{sammlung}/{link} {
+      allow read: if sammlung in ['bilderlinks', 'bilderlinks-test'];
+      allow create: if sammlung in ['bilderlinks', 'bilderlinks-test']
+        && request.resource.data.keys().hasOnly(['name', 'url', 'erstellt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
+        && request.resource.data.url is string
+        && request.resource.data.url.size() <= 1000
+        && request.resource.data.url.matches('https://[^ ]+')
+        && request.resource.data.erstellt == request.time;
+      allow update, delete: if false;
+    }
+
     function gueltig() {
       return request.resource.data.keys().hasOnly(['name', 'erstellt', 'zeit', 'geloescht', 'spieler', 'runden'])
         && request.resource.data.name is string
