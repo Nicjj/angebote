@@ -157,7 +157,7 @@
           <option>Personalausweis</option>
         </select>
       </label>
-      <label>Ausweisnummer <input id="ausweisnummer" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
+      <label><span id="nummerName">Ausweisnummer</span> <span class="opt">(freiwillig)</span><input id="ausweisnummer" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
       <div class="zwei">
         <label>Ausgestellt am <input id="ausgestellt" type="date"></label>
         <label>Gültig bis <input id="gueltigBis" type="date"></label>
@@ -165,12 +165,20 @@
       <label>Ausstellende Behörde <input id="behoerde" maxlength="80" autocomplete="off" placeholder="z. B. Stadt Dresden"></label>
     </fieldset>
 
+    <fieldset>
+      <legend>Notfallkontakt</legend>
+      <div class="zwei">
+        <label>Name <input id="notfallName" maxlength="60" autocomplete="off" placeholder="z. B. Mama"></label>
+        <label>Telefon <input id="notfallTelefon" type="tel" inputmode="tel" autocomplete="off" maxlength="30" placeholder="+49 …"></label>
+      </div>
+    </fieldset>
+
     <label>Notiz <span class="opt">(z. B. Allergien, Sitzplatzwunsch)</span>
       <textarea id="notiz" rows="2" maxlength="300"></textarea>
     </label>
 
     <label class="einwilligung">
-      <input type="checkbox" id="einwilligung" required>
+      <input type="checkbox" id="einwilligung">
       <span>Ich bin einverstanden, dass Nick diese Daten speichert und für die Planung und Buchung gemeinsamer Reisen nutzt.
         Ich kann den Eintrag jederzeit ändern oder löschen.</span>
     </label>
@@ -216,11 +224,11 @@ const SAMMLUNG = LIVE ? "personen" : "personen-test";
 const ADMIN = "nick.domscheit@gmail.com";
 
 const FELDER = ["vorname", "nachname", "geburtstag", "geburtsort", "telefon", "email",
-  "ausweisart", "ausweisnummer", "ausgestellt", "gueltigBis", "behoerde", "notiz"];
+  "ausweisart", "ausweisnummer", "ausgestellt", "gueltigBis", "behoerde", "notfallName", "notfallTelefon", "notiz"];
 const BESCHRIFTUNG = {
   vorname: "Vorname", nachname: "Nachname", geburtstag: "Geburtstag", geburtsort: "Geburtsort",
   telefon: "Telefon", email: "E-Mail", ausweisart: "Ausweis",
-  ausweisnummer: "Ausweisnummer", ausgestellt: "Ausgestellt am", gueltigBis: "Gültig bis", behoerde: "Behörde", notiz: "Notiz",
+  ausweisnummer: "Ausweisnummer", ausgestellt: "Ausgestellt am", gueltigBis: "Gültig bis", behoerde: "Behörde", notfallName: "Notfallkontakt", notfallTelefon: "Notfall-Telefon", notiz: "Notiz",
 };
 
 const $ = (id) => document.getElementById(id);
@@ -245,7 +253,7 @@ function fehler(e) {
 
 // ---------- Eingaben säubern ----------
 
-const NAMENSFELDER = ["vorname", "nachname", "geburtsort", "behoerde"];
+const NAMENSFELDER = ["vorname", "nachname", "geburtsort", "behoerde", "notfallName"];
 const regeln = {
   name: (s) => s.replace(/[^\p{L} '\-.]/gu, "").replace(/ {2,}/g, " "),   // Buchstaben, Leerzeichen, Bindestrich (Anna-Lena), Apostroph
   telefon: (s) => s.replace(/[^\d+ ()/-]/g, ""),
@@ -260,6 +268,11 @@ function bereinige(feld, regel) {
 }
 for (const id of NAMENSFELDER) $(id).addEventListener("input", (e) => bereinige(e.target, regeln.name));
 $("telefon").addEventListener("input", (e) => bereinige(e.target, regeln.telefon));
+$("notfallTelefon").addEventListener("input", (e) => bereinige(e.target, regeln.telefon));
+
+// „Reisepassnummer“ oder „Ausweisnummer“, je nach gewählter Art
+const nummerBeschriften = () => { $("nummerName").textContent = $("ausweisart").value === "Reisepass" ? "Reisepassnummer" : "Ausweisnummer"; };
+$("ausweisart").addEventListener("change", nummerBeschriften);
 $("ausweisnummer").addEventListener("input", (e) => bereinige(e.target, regeln.ausweisnummer));
 
 function formularWerte() {
@@ -275,8 +288,8 @@ function pruefe(w) {
   if (w.geburtstag > new Date().toISOString().slice(0, 10)) return ["Der Geburtstag liegt in der Zukunft.", "geburtstag"];
   if (w.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(w.email)) return ["Die E-Mail-Adresse sieht nicht richtig aus.", "email"];
   if (w.telefon && w.telefon.replace(/\D/g, "").length < 6) return ["Die Telefonnummer ist zu kurz.", "telefon"];
+  if (w.notfallTelefon && w.notfallTelefon.replace(/\D/g, "").length < 6) return ["Die Telefonnummer des Notfallkontakts ist zu kurz.", "notfallTelefon"];
   if (w.ausgestellt && w.gueltigBis && w.gueltigBis <= w.ausgestellt) return ["„Gültig bis“ muss nach „Ausgestellt am“ liegen.", "gueltigBis"];
-  if (!$("einwilligung").checked) return ["Bitte bestätige die Einwilligung.", "einwilligung"];
   return null;
 }
 
@@ -306,7 +319,7 @@ function zeichneAlle() {
       <div class="kopf"><b>${esc(p.nachname)}, ${esc(p.vorname)}</b>
         <button type="button" class="link" data-id="${p.id}">Bearbeiten</button></div>
       <dl>${FELDER.filter((f) => p[f] && !["vorname", "nachname"].includes(f)).map((f) =>
-        `<dt>${BESCHRIFTUNG[f]}</dt><dd>${esc(["geburtstag", "ausgestellt", "gueltigBis"].includes(f) ? datum(p[f]) : p[f])}</dd>`).join("")}</dl>
+        `<dt>${f === "ausweisnummer" && p.ausweisart === "Reisepass" ? "Reisepassnummer" : BESCHRIFTUNG[f]}</dt><dd>${esc(["geburtstag", "ausgestellt", "gueltigBis"].includes(f) ? datum(p[f]) : p[f])}</dd>`).join("")}</dl>
       ${hinweisAblauf(p) ? `<small>${hinweisAblauf(p).slice(3)}</small>` : ""}
     </li>`).join("") : `<li class="leer">${alle.length ? "Keine Treffer." : "Noch keine Datensätze."}</li>`;
 }
@@ -317,7 +330,8 @@ function oeffne(p = null) {
   bearbeitet = p?.id || null;
   $("formular").reset();
   for (const f of FELDER) $(f).value = p?.[f] ?? "";
-  $("einwilligung").checked = !!p;
+  $("einwilligung").checked = !!p?.einwilligung;
+  nummerBeschriften();
   $("fensterTitel").textContent = p ? `${p.vorname} ${p.nachname}` : "Neue Person";
   $("loeschen").hidden = !p;
   $("fehler").textContent = "";
@@ -340,7 +354,7 @@ $("formular").addEventListener("submit", async (e) => {
   const w = formularWerte();
   const problem = pruefe(w);
   if (problem) { $("fehler").textContent = problem[0]; $(problem[1]).focus(); return; }
-  const daten = { ...w, einwilligung: true, geaendert: serverTimestamp() };
+  const daten = { ...w, einwilligung: $("einwilligung").checked, geaendert: serverTimestamp() };
   try {
     if (bearbeitet) await updateDoc(doc(db, SAMMLUNG, bearbeitet), daten);
     else await addDoc(collection(db, SAMMLUNG), { ...daten, owner: nutzer.uid, erstellt: serverTimestamp() });
