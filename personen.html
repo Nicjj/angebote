@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Datensätze</title>
+<style>
+  :root {
+    --bg: #f4f2ec; --karte: #ffffff; --text: #1b1b1b; --leise: #6b6b66; --linie: #e2e0d8;
+    --akzent: #9a7412; --akzent-text: #ffffff; --chip: #ecebe4; --gut: #1baf7a; --schlecht: #e34948;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121211; --karte: #1f1f1d; --text: #f1eee4; --leise: #a29f94; --linie: #33332f;
+      --akzent: #d9b44a; --akzent-text: #121211; --chip: #2a2a27; --gut: #199e70; --schlecht: #e66767;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px 16px 60px; }
+  nav.seiten { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+  nav.seiten a { color: var(--text); text-decoration: none; font-size: 14px; padding: 6px 12px;
+    border-radius: 999px; background: var(--chip); }
+  nav.seiten a[aria-current] { background: var(--text); color: var(--bg); }
+  h1 { font-size: 24px; line-height: 1.15; margin: 0; }
+  h2 { font-size: 18px; margin: 26px 0 10px; }
+  .unter { color: var(--leise); font-size: 14px; margin: 4px 0 6px; }
+  .status { font-size: 13px; color: var(--leise); margin-bottom: 16px; }
+  .status[data-z="ok"] { color: var(--gut); }
+  .status[data-z="fehler"] { color: var(--schlecht); font-weight: 600; }
+
+  button { font: inherit; cursor: pointer; border: 0; border-radius: 12px; padding: 12px 18px;
+    background: var(--akzent); color: var(--akzent-text); font-weight: 600; }
+  button.leise { background: var(--chip); color: var(--text); font-weight: 500; }
+  button.gefahr { background: none; color: var(--schlecht); font-weight: 500; padding: 12px 4px; }
+  button.link { background: none; color: var(--leise); text-decoration: underline; padding: 8px 0; font-weight: 400; font-size: 14px; }
+  .breit { width: 100%; padding: 14px; font-size: 17px; }
+
+  .liste { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+  .liste button.person { width: 100%; text-align: left; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center;
+    background: var(--karte); color: var(--text); border: 1px solid var(--linie); border-radius: 12px; padding: 12px 14px; font-weight: 400; }
+  .person b { font-size: 17px; }
+  .person small { color: var(--leise); font-size: 13px; grid-column: 1; }
+  .person .pfeil { color: var(--leise); grid-row: 1 / span 2; grid-column: 2; font-size: 20px; }
+  .warnung { color: var(--schlecht); }
+  .leer { color: var(--leise); font-size: 14px; padding: 22px 12px; text-align: center;
+    border: 1px dashed var(--linie); border-radius: 12px; margin-top: 14px; }
+
+  .verwaltung { margin-top: 34px; padding-top: 14px; border-top: 1px solid var(--linie); }
+  .werkzeuge { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .werkzeuge input { flex: 1 1 200px; }
+  .adminkarte { background: var(--karte); border: 1px solid var(--linie); border-radius: 12px; padding: 12px 14px; }
+  .adminkarte dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 8px 0 0; font-size: 14px; }
+  .adminkarte dt { color: var(--leise); }
+  .adminkarte dd { margin: 0; overflow-wrap: anywhere; }
+  .adminkarte .kopf { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+
+  input, select, textarea { font: inherit; font-size: 16px; padding: 12px; border-radius: 10px; width: 100%;
+    border: 1px solid var(--linie); background: var(--bg); color: var(--text); }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--akzent); outline-offset: 0; }
+  label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
+  label .opt { color: var(--leise); font-weight: 400; }
+
+  /* Formular: auf dem Handy bildschirmfüllend, am Computer mittig */
+  dialog { border: 0; padding: 0; background: var(--karte); color: var(--text); width: 100%; max-width: 560px;
+    max-height: 100dvh; height: 100dvh; margin: 0 auto; border-radius: 0; }
+  dialog::backdrop { background: rgba(0,0,0,.55); }
+  dialog form { padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); display: grid; gap: 14px; }
+  dialog h2 { margin: 0; }
+  fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 12px; }
+  legend { font-weight: 700; font-size: 15px; margin-bottom: 8px; color: var(--akzent); }
+  .zwei { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .einwilligung { display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: start; font-weight: 400; font-size: 14px; }
+  .einwilligung input { width: 22px; height: 22px; margin: 0; }
+  .fehler { font-size: 14px; color: var(--schlecht); min-height: 1em; margin: 0; }
+  .knoepfe { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; position: sticky; bottom: 0;
+    background: var(--karte); padding-top: 8px; }
+
+  @media (min-width: 640px) {
+    h1 { font-size: 30px; }
+    .breit { width: auto; }
+    dialog { height: auto; max-height: 92vh; border-radius: 16px; margin: auto; }
+  }
+  footer { color: var(--leise); font-size: 12px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<main>
+  <nav class="seiten" id="seiten"></nav>
+
+  <h1>Datensätze</h1>
+  <div class="unter">Daten für Reisen und Buchungen. Deine Einträge siehst nur du – und Nick, der die Reisen plant.</div>
+  <div class="status" id="status">Verbinde …</div>
+
+  <!-- Ansicht für alle: eigene Einträge -->
+  <section id="eigene">
+    <button type="button" class="breit" id="neu">+ Neue Person</button>
+    <ul class="liste" id="eigeneListe"></ul>
+  </section>
+
+  <!-- Nur für Nick: alle Einträge -->
+  <section id="verwaltung" class="verwaltung" hidden>
+    <h2>Verwaltung – alle Datensätze <span id="anzahl" class="unter"></span></h2>
+    <div class="werkzeuge">
+      <input type="search" id="suche" placeholder="Suchen …" autocomplete="off">
+      <button type="button" class="leise" id="export">Als Tabelle (CSV)</button>
+      <button type="button" class="leise" id="abmelden">Abmelden</button>
+    </div>
+    <ul class="liste" id="alleListe"></ul>
+  </section>
+
+  <section id="anmeldung" class="verwaltung">
+    <button type="button" class="link" id="adminZeigen">Verwaltung (nur für Nick)</button>
+    <form id="adminForm" hidden>
+      <p class="unter">Du bekommst einen Anmeldelink per E-Mail. Öffne ihn auf diesem Gerät.</p>
+      <div class="werkzeuge">
+        <input type="email" id="adminMail" autocomplete="email" placeholder="E-Mail-Adresse" required>
+        <button type="submit">Link senden</button>
+      </div>
+      <p class="fehler" id="adminHinweis" role="status"></p>
+    </form>
+  </section>
+
+  <footer>
+    Gespeichert in einer Datenbank in Frankfurt, verschlüsselt übertragen. Jeder Eintrag ist an dieses Gerät gebunden:
+    Auf einem anderen Handy oder nach dem Löschen der Browserdaten siehst du ihn nicht mehr, er bleibt aber für Nick erhalten.
+  </footer>
+</main>
+
+<dialog id="fenster" aria-labelledby="fensterTitel">
+  <form id="formular" novalidate>
+    <h2 id="fensterTitel">Neue Person</h2>
+
+    <fieldset>
+      <legend>Person</legend>
+      <div class="zwei">
+        <label>Vorname <input id="vorname" autocomplete="given-name" maxlength="60" required></label>
+        <label>Nachname <input id="nachname" autocomplete="family-name" maxlength="60" required></label>
+      </div>
+      <div class="zwei">
+        <label>Geburtstag <input id="geburtstag" type="date" autocomplete="bday" required></label>
+        <label>Geburtsort <input id="geburtsort" maxlength="80" autocomplete="off"></label>
+      </div>
+      <label>Staatsangehörigkeit <span class="opt"></span><input id="nationalitaet" maxlength="60" value="deutsch" autocomplete="off"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Kontakt</legend>
+      <label>Telefon <input id="telefon" type="tel" inputmode="tel" autocomplete="tel" maxlength="30" placeholder="+49 …"></label>
+      <label>E-Mail <input id="email" type="email" autocomplete="email" maxlength="100"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Ausweis <span class="opt">(für Flüge und Reisen ins Ausland)</span></legend>
+      <label>Art
+        <select id="ausweisart">
+          <option value="">– keine Angabe –</option>
+          <option>Reisepass</option>
+          <option>Personalausweis</option>
+        </select>
+      </label>
+      <label>Ausweisnummer <input id="ausweisnummer" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
+      <div class="zwei">
+        <label>Ausgestellt am <input id="ausgestellt" type="date"></label>
+        <label>Gültig bis <input id="gueltigBis" type="date"></label>
+      </div>
+      <label>Ausstellende Behörde <input id="behoerde" maxlength="80" autocomplete="off" placeholder="z. B. Stadt Dresden"></label>
+    </fieldset>
+
+    <label>Notiz <span class="opt">(z. B. Allergien, Sitzplatzwunsch)</span>
+      <textarea id="notiz" rows="2" maxlength="300"></textarea>
+    </label>
+
+    <label class="einwilligung">
+      <input type="checkbox" id="einwilligung" required>
+      <span>Ich bin einverstanden, dass Nick diese Daten speichert und für die Planung und Buchung gemeinsamer Reisen nutzt.
+        Ich kann den Eintrag jederzeit ändern oder löschen.</span>
+    </label>
+
+    <p class="fehler" id="fehler" role="alert"></p>
+    <button type="button" class="gefahr" id="loeschen" hidden>Diesen Datensatz löschen</button>
+    <div class="knoepfe">
+      <button type="button" class="leise" id="abbrechen">Abbrechen</button>
+      <button type="submit">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import {
+  getAuth, onAuthStateChanged, signInAnonymously, signOut,
+  sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import {
+  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  collection, doc, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp,
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+
+// Öffentliche Web-Konfiguration des Firebase-Projekts (kein Geheimnis, der Schutz liegt in firestore.rules)
+const app = initializeApp({
+  apiKey: "AIzaSyBXh_TvYQYvc5DlCOiSM6dLbY3RrAPCNWU",
+  authDomain: "great-guinness-game.firebaseapp.com",
+  projectId: "great-guinness-game",
+  storageBucket: "great-guinness-game.firebasestorage.app",
+  messagingSenderId: "73739133293",
+  appId: "1:73739133293:web:c432f21baf25e8f2203a64",
+});
+const auth = getAuth(app);
+auth.languageCode = "de";
+const db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+
+// Live-Seite nutzt „personen“, Test-Seite und lokaler Server „personen-test“
+const LIVE = location.hostname.endsWith("github.io") && !location.pathname.includes("/test/");
+const SAMMLUNG = LIVE ? "personen" : "personen-test";
+// Wer alles sehen darf. Muss mit istAdmin() in firestore.rules übereinstimmen.
+const ADMIN = "nick.domscheit@gmail.com";
+
+const FELDER = ["vorname", "nachname", "geburtstag", "geburtsort", "nationalitaet", "telefon", "email",
+  "ausweisart", "ausweisnummer", "ausgestellt", "gueltigBis", "behoerde", "notiz"];
+const BESCHRIFTUNG = {
+  vorname: "Vorname", nachname: "Nachname", geburtstag: "Geburtstag", geburtsort: "Geburtsort",
+  nationalitaet: "Staatsangehörigkeit", telefon: "Telefon", email: "E-Mail", ausweisart: "Ausweis",
+  ausweisnummer: "Ausweisnummer", ausgestellt: "Ausgestellt am", gueltigBis: "Gültig bis", behoerde: "Behörde", notiz: "Notiz",
+};
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const datum = (iso) => iso ? new Date(iso + "T12:00:00").toLocaleDateString("de-DE") : "";
+
+let nutzer = null;
+let istAdmin = false;
+let eigene = [];
+let alle = [];
+let bearbeitet = null; // ID des gerade bearbeiteten Datensatzes
+const abos = [];
+
+function zeigeStatus(text, z = "") { $("status").textContent = text; $("status").dataset.z = z; }
+function fehler(e) {
+  console.error(e);
+  const text = ["auth/operation-not-allowed", "auth/admin-restricted-operation", "auth/configuration-not-found"].includes(e?.code)
+    ? "Die Anmeldung ist im Firebase-Projekt noch nicht eingeschaltet."
+    : e?.code === "permission-denied" ? "Keine Berechtigung – bitte Seite neu laden." : "Verbindung fehlgeschlagen – bitte Seite neu laden.";
+  zeigeStatus(text, "fehler");
+}
+
+// ---------- Eingaben säubern ----------
+
+const NAMENSFELDER = ["vorname", "nachname", "geburtsort", "nationalitaet", "behoerde"];
+const regeln = {
+  name: (s) => s.replace(/[^\p{L} '\-.]/gu, "").replace(/ {2,}/g, " "),   // Buchstaben, Leerzeichen, Bindestrich (Anna-Lena), Apostroph
+  telefon: (s) => s.replace(/[^\d+ ()/-]/g, ""),
+  ausweisnummer: (s) => s.toUpperCase().replace(/[^A-Z0-9]/g, ""),
+};
+function bereinige(feld, regel) {
+  const vorher = feld.value, nachher = regel(vorher);
+  if (nachher === vorher) return;
+  const pos = Math.max(0, (feld.selectionStart ?? nachher.length) - (vorher.length - nachher.length));
+  feld.value = nachher;
+  try { feld.setSelectionRange(pos, pos); } catch {}
+}
+for (const id of NAMENSFELDER) $(id).addEventListener("input", (e) => bereinige(e.target, regeln.name));
+$("telefon").addEventListener("input", (e) => bereinige(e.target, regeln.telefon));
+$("ausweisnummer").addEventListener("input", (e) => bereinige(e.target, regeln.ausweisnummer));
+
+function formularWerte() {
+  const w = {};
+  for (const f of FELDER) w[f] = $(f).value.trim().replace(/\s+/g, " ");
+  return w;
+}
+
+function pruefe(w) {
+  if (!w.vorname) return ["Bitte den Vornamen eintragen.", "vorname"];
+  if (!w.nachname) return ["Bitte den Nachnamen eintragen.", "nachname"];
+  if (!w.geburtstag) return ["Bitte den Geburtstag eintragen.", "geburtstag"];
+  if (w.geburtstag > new Date().toISOString().slice(0, 10)) return ["Der Geburtstag liegt in der Zukunft.", "geburtstag"];
+  if (w.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(w.email)) return ["Die E-Mail-Adresse sieht nicht richtig aus.", "email"];
+  if (w.telefon && w.telefon.replace(/\D/g, "").length < 6) return ["Die Telefonnummer ist zu kurz.", "telefon"];
+  if (w.ausgestellt && w.gueltigBis && w.gueltigBis <= w.ausgestellt) return ["„Gültig bis“ muss nach „Ausgestellt am“ liegen.", "gueltigBis"];
+  if (!$("einwilligung").checked) return ["Bitte bestätige die Einwilligung.", "einwilligung"];
+  return null;
+}
+
+// ---------- Anzeige ----------
+
+function hinweisAblauf(p) {
+  if (!p.gueltigBis) return "";
+  const tage = (new Date(p.gueltigBis) - new Date()) / 864e5;
+  if (tage < 0) return ` · <span class="warnung">${esc(p.ausweisart || "Ausweis")} abgelaufen</span>`;
+  if (tage < 180) return ` · <span class="warnung">${esc(p.ausweisart || "Ausweis")} läuft bald ab</span>`;
+  return "";
+}
+
+function zeichneEigene() {
+  $("eigeneListe").innerHTML = eigene.length
+    ? eigene.map((p) => `<li><button type="button" class="person" data-id="${p.id}">
+        <b>${esc(p.vorname)} ${esc(p.nachname)}</b><span class="pfeil" aria-hidden="true">›</span>
+        <small>geb. ${datum(p.geburtstag)}${hinweisAblauf(p)}</small></button></li>`).join("")
+    : `<li class="leer">Noch keine Einträge. Tippe auf „+ Neue Person“.</li>`;
+}
+
+function zeichneAlle() {
+  const q = $("suche").value.trim().toLowerCase();
+  const treffer = alle.filter((p) => !q || FELDER.some((f) => String(p[f] || "").toLowerCase().includes(q)));
+  $("anzahl").textContent = `(${alle.length})`;
+  $("alleListe").innerHTML = treffer.length ? treffer.map((p) => `<li class="adminkarte">
+      <div class="kopf"><b>${esc(p.nachname)}, ${esc(p.vorname)}</b>
+        <button type="button" class="link" data-id="${p.id}">Bearbeiten</button></div>
+      <dl>${FELDER.filter((f) => p[f] && !["vorname", "nachname"].includes(f)).map((f) =>
+        `<dt>${BESCHRIFTUNG[f]}</dt><dd>${esc(["geburtstag", "ausgestellt", "gueltigBis"].includes(f) ? datum(p[f]) : p[f])}</dd>`).join("")}</dl>
+      ${hinweisAblauf(p) ? `<small>${hinweisAblauf(p).slice(3)}</small>` : ""}
+    </li>`).join("") : `<li class="leer">${alle.length ? "Keine Treffer." : "Noch keine Datensätze."}</li>`;
+}
+
+// ---------- Formular ----------
+
+function oeffne(p = null) {
+  bearbeitet = p?.id || null;
+  $("formular").reset();
+  for (const f of FELDER) $(f).value = p?.[f] ?? (f === "nationalitaet" ? "deutsch" : "");
+  $("einwilligung").checked = !!p;
+  $("fensterTitel").textContent = p ? `${p.vorname} ${p.nachname}` : "Neue Person";
+  $("loeschen").hidden = !p;
+  $("fehler").textContent = "";
+  $("fenster").showModal();
+  if (!p) $("vorname").focus();
+}
+
+$("neu").addEventListener("click", () => oeffne());
+$("abbrechen").addEventListener("click", () => $("fenster").close());
+for (const liste of ["eigeneListe", "alleListe"]) {
+  $(liste).addEventListener("click", (e) => {
+    const b = e.target.closest("[data-id]");
+    if (!b) return;
+    oeffne([...eigene, ...alle].find((p) => p.id === b.dataset.id));
+  });
+}
+
+$("formular").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const w = formularWerte();
+  const problem = pruefe(w);
+  if (problem) { $("fehler").textContent = problem[0]; $(problem[1]).focus(); return; }
+  const daten = { ...w, einwilligung: true, geaendert: serverTimestamp() };
+  try {
+    if (bearbeitet) await updateDoc(doc(db, SAMMLUNG, bearbeitet), daten);
+    else await addDoc(collection(db, SAMMLUNG), { ...daten, owner: nutzer.uid, erstellt: serverTimestamp() });
+    $("fenster").close();
+    zeigeStatus("Gespeichert ✓", "ok");
+  } catch (err) { fehler(err); $("fehler").textContent = "Speichern hat nicht geklappt. Bitte nochmal versuchen."; }
+});
+
+$("loeschen").addEventListener("click", async () => {
+  if (!bearbeitet || !confirm("Diesen Datensatz wirklich endgültig löschen?")) return;
+  try { await deleteDoc(doc(db, SAMMLUNG, bearbeitet)); $("fenster").close(); zeigeStatus("Gelöscht", "ok"); }
+  catch (err) { fehler(err); }
+});
+
+// ---------- Verwaltung ----------
+
+$("adminZeigen").addEventListener("click", () => { $("adminForm").hidden = false; $("adminMail").focus(); });
+
+$("adminForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const mail = $("adminMail").value.trim().toLowerCase();
+  if (!mail) return;
+  try {
+    await sendSignInLinkToEmail(auth, mail, { url: location.href.split("?")[0], handleCodeInApp: true });
+    try { localStorage.setItem("anmeldeMail", mail); } catch {}
+    $("adminHinweis").textContent = "Link ist unterwegs – schau in dein Postfach (auch im Spam).";
+  } catch (err) { console.error(err); $("adminHinweis").textContent = "Senden hat nicht geklappt: " + (err.code || err.message); }
+});
+
+$("abmelden").addEventListener("click", async () => { await signOut(auth); });
+
+$("suche").addEventListener("input", zeichneAlle);
+
+$("export").addEventListener("click", () => {
+  const zeilen = [FELDER.map((f) => BESCHRIFTUNG[f]), ...alle.map((p) =>
+    FELDER.map((f) => ["geburtstag", "ausgestellt", "gueltigBis"].includes(f) ? datum(p[f]) : (p[f] || "")))];
+  const csv = "﻿" + zeilen.map((z) => z.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = "datensaetze-" + new Date().toISOString().slice(0, 10) + ".csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// ---------- Anmeldung und Daten ----------
+
+// Rückkehr über den Anmeldelink aus der E-Mail
+if (isSignInWithEmailLink(auth, location.href)) {
+  let mail = null;
+  try { mail = localStorage.getItem("anmeldeMail"); } catch {}
+  mail ||= prompt("Zur Bestätigung bitte deine E-Mail-Adresse eingeben:");
+  if (mail) {
+    signInWithEmailLink(auth, mail, location.href)
+      .then(() => { try { localStorage.removeItem("anmeldeMail"); } catch {} history.replaceState(null, "", location.pathname); })
+      .catch(fehler);
+  }
+}
+
+onAuthStateChanged(auth, (u) => {
+  while (abos.length) abos.pop()();
+  nutzer = u;
+  if (!u) {
+    // Jeder bekommt automatisch einen unsichtbaren Zugang auf diesem Gerät (ähnlich einem Cookie)
+    if (!isSignInWithEmailLink(auth, location.href)) signInAnonymously(auth).catch(fehler);
+    return;
+  }
+  istAdmin = !u.isAnonymous && u.emailVerified && u.email?.toLowerCase() === ADMIN;
+  $("verwaltung").hidden = !istAdmin;
+  $("anmeldung").hidden = istAdmin;
+  zeigeStatus(istAdmin ? "Angemeldet als Verwalter – du siehst alle Datensätze" : "Verbunden – du siehst nur deine eigenen Einträge", "ok");
+
+  const zuListe = (snap) => snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (a.nachname + a.vorname).localeCompare(b.nachname + b.vorname, "de"));
+  abos.push(onSnapshot(query(collection(db, SAMMLUNG), where("owner", "==", u.uid)),
+    (snap) => { eigene = zuListe(snap); zeichneEigene(); }, fehler));
+  if (istAdmin) {
+    abos.push(onSnapshot(collection(db, SAMMLUNG), (snap) => { alle = zuListe(snap); zeichneAlle(); }, fehler));
+  }
+});
+</script>
+<script>
+// Navigation aus seiten.json: die Action legt dort fest, welche Seiten freigegeben sind.
+// Ohne Datei (lokaler Server) werden alle Seiten gezeigt.
+(async () => {
+  let seiten = null;
+  try { const r = await fetch("seiten.json", { cache: "no-store" }); if (r.ok) seiten = await r.json(); } catch {}
+  seiten ||= [{ href: "./", name: "Start" }, { href: "guinness.html", name: "Guinness-Spiel" }, { href: "bilder.html", name: "Zu den Bildern" }, { href: "personen.html", name: "Datensätze" }, { href: "angebote.html", name: "Angebote" }];
+  const nav = document.getElementById("seiten");
+  if (seiten.length < 2) return nav.remove();
+  const hier = location.pathname.split("/").pop() || "./";
+  nav.innerHTML = seiten.map((s) => `<a href="${s.href}"${s.href === hier || (hier === "index.html" && s.href === "./") ? ' aria-current="page"' : ""}>${s.name}</a>`).join("");
+})();
+</script>
+</body>
+</html>

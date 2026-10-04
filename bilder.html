@@ -227,7 +227,7 @@ onSnapshot(
 (async () => {
   let seiten = null;
   try { const r = await fetch("seiten.json", { cache: "no-store" }); if (r.ok) seiten = await r.json(); } catch {}
-  seiten ||= [{ href: "./", name: "Start" }, { href: "guinness.html", name: "Guinness-Spiel" }, { href: "bilder.html", name: "Zu den Bildern" }, { href: "angebote.html", name: "Angebote" }];
+  seiten ||= [{ href: "./", name: "Start" }, { href: "guinness.html", name: "Guinness-Spiel" }, { href: "bilder.html", name: "Zu den Bildern" }, { href: "personen.html", name: "Datensätze" }, { href: "angebote.html", name: "Angebote" }];
   const nav = document.getElementById("seiten");
   if (seiten.length < 2) return nav.remove();
   const hier = location.pathname.split("/").pop() || "./";

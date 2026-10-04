@@ -48,7 +48,7 @@ jobs:
           for f in testing/*.html; do
             sed 's#<head>#<head>\n<meta name="robots" content="noindex">#' "$f" > "_site/test/$(basename "$f")"
           done
-          echo '[{"href":"./","name":"Start"},{"href":"guinness.html","name":"Guinness-Spiel"},{"href":"bilder.html","name":"Zu den Bildern"},{"href":"angebote.html","name":"Angebote"}]' > _site/test/seiten.json
+          echo '[{"href":"./","name":"Start"},{"href":"guinness.html","name":"Guinness-Spiel"},{"href":"bilder.html","name":"Zu den Bildern"},{"href":"personen.html","name":"Datensätze"},{"href":"angebote.html","name":"Angebote"}]' > _site/test/seiten.json
           node testing/tools/aktualisieren.js _site/test
 
       - uses: actions/configure-pages@v5

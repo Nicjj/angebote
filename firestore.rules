@@ -34,6 +34,46 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Datensätze (Personendaten für Reisen): jeder sieht und ändert nur, was er selbst angelegt hat.
+    // Nur Nick (per E-Mail-Link angemeldet, Adresse bestätigt) sieht und bearbeitet alle.
+    // „personen“ = Live-Seite, „personen-test“ = Test-Seite und lokaler Server
+    match /{sammlung}/{person} {
+      allow read: if sammlung in ['personen', 'personen-test'] && request.auth != null
+        && (resource.data.owner == request.auth.uid || istAdmin());
+      allow create: if sammlung in ['personen', 'personen-test'] && request.auth != null
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.erstellt == request.time
+        && gueltigePerson();
+      allow update: if sammlung in ['personen', 'personen-test'] && request.auth != null
+        && (resource.data.owner == request.auth.uid || istAdmin())
+        && request.resource.data.owner == resource.data.owner
+        && request.resource.data.erstellt == resource.data.erstellt
+        && gueltigePerson();
+      allow delete: if sammlung in ['personen', 'personen-test'] && request.auth != null
+        && (resource.data.owner == request.auth.uid || istAdmin());
+    }
+
+    function istAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'nick.domscheit@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    function gueltigePerson() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['owner', 'erstellt', 'geaendert', 'einwilligung',
+          'vorname', 'nachname', 'geburtstag', 'geburtsort', 'nationalitaet', 'telefon', 'email',
+          'ausweisart', 'ausweisnummer', 'ausgestellt', 'gueltigBis', 'behoerde', 'notiz'])
+        && d.einwilligung == true
+        && d.vorname is string && d.vorname.size() > 0 && d.vorname.size() <= 60
+        && d.nachname is string && d.nachname.size() > 0 && d.nachname.size() <= 60
+        && d.geburtstag is string && d.geburtstag.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && d.get('notiz', '').size() <= 300
+        && d.get('geburtsort', '').size() <= 80 && d.get('behoerde', '').size() <= 80
+        && d.get('email', '').size() <= 100 && d.get('telefon', '').size() <= 30
+        && d.get('ausweisnummer', '').size() <= 20 && d.get('nationalitaet', '').size() <= 60;
+    }
+
     function gueltig() {
       return request.resource.data.keys().hasOnly(['name', 'erstellt', 'zeit', 'geloescht', 'spieler', 'runden'])
         && request.resource.data.name is string
