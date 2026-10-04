@@ -1,6 +1,6 @@
 name: Seite veröffentlichen
 
-# live  → https://nicjj.github.io/angebote/       Startseite, Guinness-Spiel, Bilder (Angebote und Datensätze gesperrt)
+# live  → https://nicjj.github.io/angebote/       Startseite, Guinness-Spiel, Bilder, Datensätze (Angebote gesperrt)
 # testing → https://nicjj.github.io/angebote/test/  alle Seiten, noindex
 # Beide Fassungen werden bei jedem Lauf gemeinsam gebaut, weil GitHub Pages nur eine Seite je Repo kennt.
 on:
@@ -33,14 +33,14 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
 
-      # Auf live freigegeben: Startseite, Guinness-Spiel, Bilder (Stand 04.10.2026).
+      # Auf live freigegeben: Startseite, Guinness-Spiel, Bilder, Datensätze (Stand 04.10.2026).
       # Zum Freigeben weiterer Seiten: Datei hier kopieren und in seiten.json eintragen
       # (seiten.json steuert Menü und anklickbare Kästen der Startseite). Für die Angebote zusätzlich aktualisieren.js aufrufen.
       - name: Live-Fassung bauen
         run: |
           mkdir -p _site
-          for f in index guinness bilder; do cp "live/$f.html" _site/; done
-          echo '[{"href":"./","name":"Start"},{"href":"guinness.html","name":"Guinness-Spiel"},{"href":"bilder.html","name":"Zu den Bildern"}]' > _site/seiten.json
+          for f in index guinness bilder personen; do cp "live/$f.html" _site/; done
+          echo '[{"href":"./","name":"Start"},{"href":"guinness.html","name":"Guinness-Spiel"},{"href":"bilder.html","name":"Zu den Bildern"},{"href":"personen.html","name":"Datensätze"}]' > _site/seiten.json
 
       - name: Test-Fassung bauen
         run: |
