@@ -140,7 +140,6 @@
         <label>Geburtstag <input id="geburtstag" type="date" autocomplete="bday" required></label>
         <label>Geburtsort <input id="geburtsort" maxlength="80" autocomplete="off"></label>
       </div>
-      <label>Staatsangehörigkeit <span class="opt"></span><input id="nationalitaet" maxlength="60" value="deutsch" autocomplete="off"></label>
     </fieldset>
 
     <fieldset>
@@ -216,11 +215,11 @@ const SAMMLUNG = LIVE ? "personen" : "personen-test";
 // Wer alles sehen darf. Muss mit istAdmin() in firestore.rules übereinstimmen.
 const ADMIN = "nick.domscheit@gmail.com";
 
-const FELDER = ["vorname", "nachname", "geburtstag", "geburtsort", "nationalitaet", "telefon", "email",
+const FELDER = ["vorname", "nachname", "geburtstag", "geburtsort", "telefon", "email",
   "ausweisart", "ausweisnummer", "ausgestellt", "gueltigBis", "behoerde", "notiz"];
 const BESCHRIFTUNG = {
   vorname: "Vorname", nachname: "Nachname", geburtstag: "Geburtstag", geburtsort: "Geburtsort",
-  nationalitaet: "Staatsangehörigkeit", telefon: "Telefon", email: "E-Mail", ausweisart: "Ausweis",
+  telefon: "Telefon", email: "E-Mail", ausweisart: "Ausweis",
   ausweisnummer: "Ausweisnummer", ausgestellt: "Ausgestellt am", gueltigBis: "Gültig bis", behoerde: "Behörde", notiz: "Notiz",
 };
 
@@ -246,7 +245,7 @@ function fehler(e) {
 
 // ---------- Eingaben säubern ----------
 
-const NAMENSFELDER = ["vorname", "nachname", "geburtsort", "nationalitaet", "behoerde"];
+const NAMENSFELDER = ["vorname", "nachname", "geburtsort", "behoerde"];
 const regeln = {
   name: (s) => s.replace(/[^\p{L} '\-.]/gu, "").replace(/ {2,}/g, " "),   // Buchstaben, Leerzeichen, Bindestrich (Anna-Lena), Apostroph
   telefon: (s) => s.replace(/[^\d+ ()/-]/g, ""),
@@ -317,7 +316,7 @@ function zeichneAlle() {
 function oeffne(p = null) {
   bearbeitet = p?.id || null;
   $("formular").reset();
-  for (const f of FELDER) $(f).value = p?.[f] ?? (f === "nationalitaet" ? "deutsch" : "");
+  for (const f of FELDER) $(f).value = p?.[f] ?? "";
   $("einwilligung").checked = !!p;
   $("fensterTitel").textContent = p ? `${p.vorname} ${p.nachname}` : "Neue Person";
   $("loeschen").hidden = !p;
