@@ -113,14 +113,11 @@
 
   <section id="anmeldung" class="verwaltung">
     <button type="button" class="link" id="adminZeigen">Verwaltung (nur für Nick)</button>
-    <form id="adminForm" hidden>
-      <p class="unter">Du bekommst einen Anmeldelink per E-Mail. Öffne ihn auf diesem Gerät.</p>
-      <div class="werkzeuge">
-        <input type="email" id="adminMail" autocomplete="email" placeholder="E-Mail-Adresse" required>
-        <button type="submit">Link senden</button>
-      </div>
+    <div id="adminForm" hidden>
+      <p class="unter">Melde dich mit deinem Google-Konto an. Nur Nicks Konto sieht danach alle Datensätze.</p>
+      <button type="button" id="googleAnmelden">Mit Google anmelden</button>
       <p class="fehler" id="adminHinweis" role="status"></p>
-    </form>
+    </div>
   </section>
 
   <footer>
@@ -192,7 +189,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import {
   getAuth, onAuthStateChanged, signInAnonymously, signOut,
-  sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
+  isSignInWithEmailLink, signInWithEmailLink,
+  GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
@@ -360,18 +358,26 @@ $("loeschen").addEventListener("click", async () => {
 
 // ---------- Verwaltung ----------
 
-$("adminZeigen").addEventListener("click", () => { $("adminForm").hidden = false; $("adminMail").focus(); });
+$("adminZeigen").addEventListener("click", () => { $("adminForm").hidden = false; });
 
-$("adminForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const mail = $("adminMail").value.trim().toLowerCase();
-  if (!mail) return;
+// Verwalter-Anmeldung über Google. Popup zuerst; blockiert der Browser es, per Weiterleitung.
+$("googleAnmelden").addEventListener("click", async () => {
+  const anbieter = new GoogleAuthProvider();
+  anbieter.setCustomParameters({ prompt: "select_account", login_hint: ADMIN });
+  $("adminHinweis").textContent = "";
   try {
-    await sendSignInLinkToEmail(auth, mail, { url: location.href.split("?")[0], handleCodeInApp: true });
-    try { localStorage.setItem("anmeldeMail", mail); } catch {}
-    $("adminHinweis").textContent = "Link ist unterwegs – schau in dein Postfach (auch im Spam).";
-  } catch (err) { console.error(err); $("adminHinweis").textContent = "Senden hat nicht geklappt: " + (err.code || err.message); }
+    const { user } = await signInWithPopup(auth, anbieter);
+    if (user.email?.toLowerCase() !== ADMIN) $("adminHinweis").textContent = "Mit diesem Konto gibt es keine Verwaltung – du siehst weiter nur deine eigenen Einträge.";
+  } catch (err) {
+    if (["auth/popup-blocked", "auth/operation-not-supported-in-this-environment"].includes(err.code)) return signInWithRedirect(auth, anbieter);
+    if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") return;
+    console.error(err);
+    $("adminHinweis").textContent = err.code === "auth/operation-not-allowed"
+      ? "Die Google-Anmeldung ist im Firebase-Projekt noch nicht eingeschaltet."
+      : "Anmeldung hat nicht geklappt: " + (err.code || err.message);
+  }
 });
+getRedirectResult(auth).catch((err) => { console.error(err); $("adminHinweis").textContent = "Anmeldung hat nicht geklappt: " + (err.code || err.message); });
 
 $("abmelden").addEventListener("click", async () => { await signOut(auth); });
 
