@@ -4,6 +4,6 @@
     { "name": "Dippoldiswalde", "plz": "01744", "lat": 50.8961, "lng": 13.6705 },
     { "name": "Altenberg", "plz": "01773", "lat": 50.7636, "lng": 13.742 }
   ],
-  "lieblingslaeden": ["Kaufland", "REWE", "EDEKA", "E center", "nahkauf"],
+  "lieblingslaeden": ["Kaufland", "REWE", "EDEKA", "E center", "nahkauf", "Netto Marken-Discount", "Netto"],
   "getraenkehandel": "getränk|trinkgut|fristo|hol.?ab|nuck|durstexpress|flaschenpost"
 }
