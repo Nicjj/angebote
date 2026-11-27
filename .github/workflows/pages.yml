@@ -51,6 +51,25 @@ jobs:
           echo '[{"href":"./","name":"Start"},{"href":"guinness.html","name":"Guinness-Spiel"},{"href":"bilder.html","name":"Zu den Bildern"},{"href":"personen.html","name":"Datensätze"},{"href":"angebote.html","name":"Angebote"}]' > _site/test/seiten.json
           node testing/tools/aktualisieren.js _site/test
 
+      # E-Mail an Nick, wenn ein Artikel der Merkliste neu im Angebot ist (nur an ihn, Seite bleibt gesperrt).
+      # Braucht die Repo-Secrets MAIL_KONTO (Gmail-Adresse) und MAIL_PASSWORT (Gmail-App-Passwort).
+      # Bereits gemeldete Angebote merkt sich der Actions-Cache. Ein Fehler hier stoppt das Veröffentlichen nicht.
+      - name: Gemeldete Angebote laden
+        uses: actions/cache/restore@v4
+        with: { path: gemeldet.json, key: "gemeldet-${{ github.run_id }}", restore-keys: "gemeldet-" }
+      - name: Neue Angebote per Mail melden
+        continue-on-error: true
+        env:
+          MAIL_KONTO: ${{ secrets.MAIL_KONTO }}
+          MAIL_PASSWORT: ${{ secrets.MAIL_PASSWORT }}
+        run: |
+          npm install --prefix mail --no-save --no-package-lock nodemailer@6.9.16 >/dev/null
+          NODE_PATH="$PWD/mail/node_modules" node testing/tools/benachrichtigen.js _site/test/angebote.json gemeldet.json
+      - name: Gemeldete Angebote speichern
+        if: always() && hashFiles('gemeldet.json') != ''
+        uses: actions/cache/save@v4
+        with: { path: gemeldet.json, key: "gemeldet-${{ github.run_id }}" }
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with: { path: _site }
